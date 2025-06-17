@@ -1,0 +1,255 @@
+from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import csv
+import io
+from typing import List, Dict
+from prompts import create_category_prompt, create_subcategory_prompt, find_match, find_match_mini
+import asyncio
+import uuid
+
+app = FastAPI()
+
+# Allow CORS for local frontend development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+uploaded_data = []
+progress_tracker = {}
+progress_dict = {}
+
+@app.post("/upload")
+def upload_file(file: UploadFile = File(...)):
+    raw = file.file.read()
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        content = raw.decode("cp1252")
+    reader = csv.DictReader(io.StringIO(content))
+    global uploaded_data
+    uploaded_data = list(reader)
+    return {"status": "success", "rows": len(uploaded_data)}
+
+@app.get("/data")
+def get_data():
+    return uploaded_data
+
+BATCH_SIZE = 10  # Tune this for your OpenAI API context window and rate limits
+
+async def process_row(row, client, category_map):
+    from prompts import create_category_prompt, create_subcategory_prompt, find_match
+    import re
+    proposal_text = ''
+    for k, v in row.items():
+        if k and k.strip().lower().replace('_', '').replace(' ', '') == 'proposal':
+            proposal_text = v
+            break
+    if not proposal_text:
+        proposal_text = next((v for v in row.values() if v), '')
+    category_prompt = create_category_prompt(proposal_text)
+    #print(category_prompt)
+    category_response = await asyncio.to_thread(find_match, category_prompt, proposal_text, client)
+    #print(category_response)
+    match = re.search(r'Selected Category:\s*\d+\s*[-\.]?\s*(.+)', category_response)
+    if match:
+        category_name = match.group(1).strip()
+        # Fix: match category_name to the correct key (number) in category_map by exact name, not substring
+        category_num = None
+        for num, subcats in category_map.items():
+            # Use instruct.csv order for category names
+            instruct_names = [
+                'Board of Directors',
+                'Compensation',
+                'Corporate Actions',
+                'Corporate Governance',
+                'Corporate Structure',
+                'Shareholder Equity',
+                'Shareholder Rights'
+            ]
+            if category_name.lower() == instruct_names[int(num)-1].lower():
+                category_num = num
+                break
+        if not category_num:
+            category_num = '1'  # fallback to first
+    else:
+        match2 = re.search(r'(Board of Directors|Compensation|Corporate Actions|Corporate Governance|Corporate Structure|Shareholder Equity|Shareholder Rights)', category_response, re.IGNORECASE)
+        if match2:
+            category_name = match2.group(1).strip()
+            instruct_names = [
+                'Board of Directors',
+                'Compensation',
+                'Corporate Actions',
+                'Corporate Governance',
+                'Corporate Structure',
+                'Shareholder Equity',
+                'Shareholder Rights'
+            ]
+            category_num = None
+            for num, _ in category_map.items():
+                if category_name.lower() == instruct_names[int(num)-1].lower():
+                    category_num = num
+                    break
+            if not category_num:
+                category_num = '1'
+        else:
+            category_num = '1'
+            category_name = 'Board of Directors'
+    subcategories = category_map.get(category_num, '')
+    subcategory_prompt = create_subcategory_prompt(proposal_text, f"{category_num} - {category_name}", subcategories)
+    print(subcategory_prompt)
+    subcategory_response = await asyncio.to_thread(find_match, subcategory_prompt, proposal_text, client)
+    match2 = re.search(r'Selected Sub-Category: (.+)', subcategory_response)
+    if match2:
+        subcategory = match2.group(1).strip()
+    else:
+        subcategory = ''
+    row['Nano_Category'] = category_name
+    row['Nano_Subcategory'] = subcategory
+    return {
+        'proposal_text': proposal_text,
+        'Nano_Category': category_name,
+        'Nano_Subcategory': subcategory
+    }
+
+@app.post("/query")
+async def query_llm(request: Request):
+    from prompts import get_openai_client
+    global uploaded_data
+    client = get_openai_client()
+    rows = uploaded_data
+    category_map = {
+        '1': 'Articles/ByLaws, Board Classification, Board Composition, Board Size, Cumulative Voting, Director Remuneration, Elections, Elections, Board Size, Indemnification/Liability, Independent Board Chairman, Majority Voting, Miscellaneous Board of Directors, Proxy Access, Quorum Requirements, Remove Directors/Board Members',
+        '2': 'Articles/ByLaws, Bonus Plan, Cash/Stock Bonus Plan, Directors Fees, Employee Stock Purchase Program, Employment Agreements, Executive Pay Evaluation (Say on Pay), Golden Parachutes, Miscellaneous Compensation, Omnibus Stock Plan, Restricted Stock Plan, Stock Option Plans',
+        '3': 'Acquisition Agreement, Articles/ByLaws, Assets, Corporate Actions, Dividend Reinvestment Plan, Investment Advisory Agreement, Investment Agreement/Policy, Merger Plan, Miscellaneous Corporate Actions, Reorganization Plan, Scheme Arrangement',
+        '4': 'Audit Related, Company Name Change, Corporate Governance, Financial Statements, Meeting Management, Miscellaneous Corporate Governance',
+        '5': 'Investment Advisory Agreement, Liquidation Plan, Miscellaneous Corporate Actions, Spin Off',
+        '6': 'Allot Securities, Articles/ByLaws, Authorize Stock Decrease, Authorize Stock Increase, Capital Accumulation Plan, Class of Stock Elimination, Dividend Reinvestment Plan, Miscellaneous Shareholder Equity, New Class of Stock, Par Value, Repurchase Program, Share Capital, Shareholder Equity, Stock Conversion, Stock Issuance, Stock Splits/Reverse Stock Splits, Stock Terms Revision, Voting Rights, Warrants/Bonds/Notes',
+        '7': 'Antitakeover Provisions, Articles/ByLaws, Control Share Acquisition, Directors/Board Removal, Meeting Management, Miscellaneous Shareholder Rights, Supermajority Voting, Voting Rights'
+    }
+    # Progress tracking
+    job_id = str(uuid.uuid4())
+    progress_dict[job_id] = {"current": 0, "total": len(rows), "done": False}
+    all_results = []
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i:i+BATCH_SIZE]
+        batch_results = await asyncio.gather(*[process_row(row, client, category_map) for row in batch])
+        all_results.extend(batch_results)
+        progress_dict[job_id]["current"] = min(i + BATCH_SIZE, len(rows))
+    progress_dict[job_id]["done"] = True
+    progress_dict[job_id]["current"] = len(rows)
+    return {"results": all_results, "data": uploaded_data, "job_id": job_id}
+
+async def process_row_mini(row, client, category_map):
+    import re
+    proposal_text = ''
+    for k, v in row.items():
+        if k and k.strip().lower().replace('_', '').replace(' ', '') == 'proposal':
+            proposal_text = v
+            break
+    if not proposal_text:
+        proposal_text = next((v for v in row.values() if v), '')
+    category_prompt = create_category_prompt(proposal_text)
+    category_response = await asyncio.to_thread(find_match_mini, category_prompt, proposal_text, client)
+    match = re.search(r'Selected Category:\s*\d+\s*[-\.]?\s*(.+)', category_response)
+    if match:
+        category_name = match.group(1).strip()
+        # Fix: match category_name to the correct key (number) in category_map by exact name, not substring
+        category_num = None
+        for num, subcats in category_map.items():
+            # Use instruct.csv order for category names
+            instruct_names = [
+                'Board of Directors',
+                'Compensation',
+                'Corporate Actions',
+                'Corporate Governance',
+                'Corporate Structure',
+                'Shareholder Equity',
+                'Shareholder Rights'
+            ]
+            if category_name.lower() == instruct_names[int(num)-1].lower():
+                category_num = num
+                break
+        if not category_num:
+            category_num = '1'  # fallback to first
+    else:
+        # Updated regex to match new category names from instruct.csv
+        match2 = re.search(r'(Board of Directors|Compensation|Corporate Actions|Corporate Governance|Corporate Structure|Shareholder Equity|Shareholder Rights)', category_response, re.IGNORECASE)
+        if match2:
+            category_name = match2.group(1).strip()
+            instruct_names = [
+                'Board of Directors',
+                'Compensation',
+                'Corporate Actions',
+                'Corporate Governance',
+                'Corporate Structure',
+                'Shareholder Equity',
+                'Shareholder Rights'
+            ]
+            category_num = None
+            for num, _ in category_map.items():
+                if category_name.lower() == instruct_names[int(num)-1].lower():
+                    category_num = num
+                    break
+            if not category_num:
+                category_num = '1'
+        else:
+            category_num = '1'
+            category_name = 'Board of Directors'
+    subcategories = category_map.get(category_num, '')
+    subcategory_prompt = create_subcategory_prompt(proposal_text, f"{category_num} - {category_name}", subcategories)
+    
+    subcategory_response = await asyncio.to_thread(find_match_mini, subcategory_prompt, proposal_text, client)
+    match2 = re.search(r'Selected Sub-Category: (.+)', subcategory_response)
+    if match2:
+        subcategory = match2.group(1).strip()
+    else:
+        subcategory = ''
+    row['Mini_Category'] = category_name
+    row['Mini_Subcategory'] = subcategory
+    return {
+        'proposal_text': proposal_text,
+        'Mini_Category': category_name,
+        'Mini_Subcategory': subcategory
+    }
+
+@app.post("/query_mini")
+async def query_llm_mini(request: Request):
+    from prompts import get_openai_client
+    global uploaded_data
+    client = get_openai_client()
+    rows = uploaded_data
+    category_map = {
+        '1': 'Articles/ByLaws, Board Classification, Board Composition, Board Size, Cumulative Voting, Director Remuneration, Elections, Elections, Board Size, Indemnification/Liability, Independent Board Chairman, Majority Voting, Miscellaneous Board of Directors, Proxy Access, Quorum Requirements, Remove Directors/Board Members',
+        '2': 'Articles/ByLaws, Bonus Plan, Cash/Stock Bonus Plan, Directors Fees, Employee Stock Purchase Program, Employment Agreements, Executive Pay Evaluation (Say on Pay), Golden Parachutes, Miscellaneous Compensation, Omnibus Stock Plan, Restricted Stock Plan, Stock Option Plans',
+        '3': 'Acquisition Agreement, Articles/ByLaws, Assets, Corporate Actions, Dividend Reinvestment Plan, Investment Advisory Agreement, Investment Agreement/Policy, Merger Plan, Miscellaneous Corporate Actions, Reorganization Plan, Scheme Arrangement',
+        '4': 'Audit Related, Company Name Change, Corporate Governance, Financial Statements, Meeting Management, Miscellaneous Corporate Governance',
+        '5': 'Investment Advisory Agreement, Liquidation Plan, Miscellaneous Corporate Actions, Spin Off',
+        '6': 'Allot Securities, Articles/ByLaws, Authorize Stock Decrease, Authorize Stock Increase, Capital Accumulation Plan, Class of Stock Elimination, Dividend Reinvestment Plan, Miscellaneous Shareholder Equity, New Class of Stock, Par Value, Repurchase Program, Share Capital, Shareholder Equity, Stock Conversion, Stock Issuance, Stock Splits/Reverse Stock Splits, Stock Terms Revision, Voting Rights, Warrants/Bonds/Notes',
+        '7': 'Antitakeover Provisions, Articles/ByLaws, Control Share Acquisition, Directors/Board Removal, Meeting Management, Miscellaneous Shareholder Rights, Supermajority Voting, Voting Rights'
+    }
+    job_id = str(uuid.uuid4())
+    progress_dict[job_id] = {"current": 0, "total": len(rows), "done": False}
+    all_results = []
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i:i+BATCH_SIZE]
+        batch_results = await asyncio.gather(*[process_row_mini(row, client, category_map) for row in batch])
+        all_results.extend(batch_results)
+        progress_dict[job_id]["current"] = min(i + BATCH_SIZE, len(rows))
+    progress_dict[job_id]["done"] = True
+    progress_dict[job_id]["current"] = len(rows)
+    return {"results": all_results, "data": uploaded_data, "job_id": job_id}
+
+@app.get("/progress/{job_id}")
+def get_progress(job_id: str):
+    prog = progress_dict.get(job_id)
+    if not prog:
+        return {"progress": 0, "done": True}
+    percent = 0
+    if prog["total"] > 0:
+        percent = int(100 * prog["current"] / prog["total"])
+    return {"progress": percent, "done": prog["done"]}
