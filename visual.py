@@ -86,6 +86,7 @@ def plot_stacked_area_and_summarize(agg, key):
 
     min_width_for_each = 0.08
 
+    label_map = {1: 'For', 2: 'Against', 0: 'Unvoted'}
     # Annotate shares counts and percentages
     for idx in range(len(y)):
         bar_total = np.sum(area_data[idx, :] * total_length[idx])
@@ -93,21 +94,21 @@ def plot_stacked_area_and_summarize(agg, key):
         if bar_total < 0.25:
             text = []
             for i in range(3):
-                class_label = f"({i if i != 2 else 0})"
+                label = label_map[i]
                 if group_counts[idx, i] > 0:
-                    text.append(f"{class_label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%")
+                    text.append(f"({i}) {label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%")
             ax.text(bar_total + 0.01, y[idx], ', '.join(text), va='center', fontsize=10)
         else:
             left_val = 0
             for i in range(3):
-                class_label = f"({i if i != 2 else 0})"
+                label = label_map[i]
                 if widths[i] > min_width_for_each and group_counts[idx, i] > 0:
                     ax.text(left_val + widths[i]/2, y[idx], 
-                            f"{class_label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%", 
+                            f"({i}) {label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%", 
                             va='center', ha='center', color='black', fontsize=10)
                 elif group_counts[idx, i] > 0:
                     ax.text(bar_total + 0.01, y[idx], 
-                            f"{class_label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%", 
+                            f"({i}) {label} {format_number(group_counts[idx, i])}, {group_shares[idx, i]*100:.1f}%", 
                             va='center', ha='left', color=colors[i], fontsize=10)
                 left_val += widths[i]
 
@@ -116,9 +117,9 @@ def plot_stacked_area_and_summarize(agg, key):
         bar_total = np.sum(area_data[idx, :] * total_length[idx])
         acc_text = []
         for i in range(3):
-            class_label = f"({i if i != 2 else 0})"
+            label = label_map[i]
             if group_accounts[idx, i] > 0:
-                acc_text.append(f"{class_label} {format_number(group_accounts[idx, i])}")
+                acc_text.append(f"({i}) {label} {format_number(group_accounts[idx, i])}")
         if acc_text:
             ax.text(bar_total + 0.18, y[idx], " | ".join(acc_text), va='center', ha='left', color='dimgray', fontsize=10, fontweight='bold')
 
@@ -129,7 +130,7 @@ def plot_stacked_area_and_summarize(agg, key):
 
 def main():
     import os
-    df = pd.read_csv('df_956_account_new.csv')  # changed to the correct input file
+    df = pd.read_csv('df_956_account_triple.csv')  # changed to the correct input file
     # Ensure output directory exists
     os.makedirs('images', exist_ok=True)
     df['final_key'] = df['final_key'].replace('2268837.0_2268273.0__-1.0', '2268837.0')

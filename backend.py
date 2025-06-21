@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import csv
@@ -7,6 +7,8 @@ from typing import List, Dict
 from prompts import create_category_prompt, create_subcategory_prompt, find_match, find_match_mini
 import asyncio
 import uuid
+import subprocess
+import os
 
 app = FastAPI()
 
@@ -253,3 +255,18 @@ def get_progress(job_id: str):
     if prog["total"] > 0:
         percent = int(100 * prog["current"] / prog["total"])
     return {"progress": percent, "done": prog["done"]}
+
+@app.post("/plot_hist_2025")
+async def plot_hist_2025(background_tasks: BackgroundTasks):
+    """
+    Run plot_hist_2025_proposal.py in the webappvote conda environment as a background task.
+    Returns a job_id for progress tracking (optional, for now just returns status).
+    """
+    def run_script():
+        # Use conda run to ensure the correct environment
+        subprocess.run([
+            'conda', 'run', '-n', 'webappvote', '--no-capture-output',
+            'python', 'plot_hist_2025_proposal.py'
+        ], cwd=os.path.dirname(__file__))
+    background_tasks.add_task(run_script)
+    return {"status": "started"}
