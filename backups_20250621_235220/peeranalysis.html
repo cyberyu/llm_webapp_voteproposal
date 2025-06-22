@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Peer Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; margin: 0; padding-top: 60px; }
+        /* Navigation Bar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            color: #ecf0f1;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-links a {
+            color: #bdc3c7;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .nav-links a:hover {
+            background: #34495e;
+            color: #ecf0f1;
+        }
+        .nav-links a.active {
+            background: #3498db;
+            color: white;
+            cursor: default;
+        }
+        /* Main content styles */
+        .main-content {
+            display: flex;
+            gap: 24px;
+            max-width: 1400px;
+            margin: 32px auto;
+        }
+        .left-panel {
+            flex: 0 0 55%;
+            max-width: 55%;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 32px;
+        }
+        .right-panel {
+            flex: 1;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 32px;
+            min-height: 600px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 32px auto; 
+            background: #fff; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1); 
+            padding: 32px; 
+        }
+        h2 { margin-top: 0; color: #2c3e50; }
+        .upload-section {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 2px dashed #dee2e6;
+        }
+        .upload-section input[type="file"] {
+            margin-bottom: 12px;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background: white;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        #tableContainer {
+            overflow: auto;
+            max-height: 600px;
+            max-width: 100%;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        table {
+            border-collapse: collapse;
+            width: auto;
+            min-width: 400px;
+            max-width: 900px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 13px;
+            vertical-align: top;
+        }
+        th {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        tr:hover {
+            background: #e3f2fd;
+            transition: background-color 0.2s ease;
+        }
+        /* Special styling for proposal column */
+        .proposal-cell {
+            max-width: 600px;
+            min-width: 400px;
+            word-wrap: break-word;
+            white-space: normal;
+            line-height: 1.4;
+        }
+        .proposal-header {
+            min-width: 400px;
+        }
+        /* Other important columns */
+        .category-cell {
+            min-width: 120px;
+            font-weight: 500;
+        }
+        .issuer-cell {
+            min-width: 100px;
+            font-weight: 500;
+        }
+        .numeric-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            min-width: 80px;
+        }
+        .no-data {
+            color: #6c757d;
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+        }
+        .file-info {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            color: #155724;
+        }
+        .filter-info {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #cce5ff;
+            border: 1px solid #99ccff;
+            border-radius: 4px;
+            color: #004085;
+            display: none;
+        }
+        .error-message {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            color: #721c24;
+        }
+        #chartContainer {
+            margin-top: 24px;
+            height: 500px;
+            position: relative;
+        }
+        #issuerChartContainer {
+            margin-top: 24px;
+            height: 500px;
+            position: relative;
+        }
+        #comparisonChartContainer {
+            margin-top: 24px;
+            height: 600px;
+            position: relative;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .chart-instructions {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+        .filter-controls {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .filter-btn {
+            padding: 6px 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .filter-btn:hover {
+            background: #218838;
+        }
+        .filter-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .large-dataset-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #dee2e6;
+        }
+        .large-dataset-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .large-dataset-section h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        #largeTableContainer {
+            overflow: auto;
+            max-height: 600px;
+            max-width: 100%;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 16px;
+        }
+        .dataset-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        .no-chart {
+            color: #6c757d;
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">LLM WebApp</a>
+            <ul class="nav-links">
+                <li><a href="webui.html">Main Table</a></li>
+                <li><a href="detail.html">Detail Viewer</a></li>
+                <li><a href="histrogram.html">Histogram Analyzer</a></li>
+                <li><a href="peeranalysis.html" class="active">Peer Analysis</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <div class="left-panel">
+            <h2>Peer Analysis</h2>
+            
+            <div class="upload-section">
+                <h3>Upload CSV File</h3>
+                <input type="file" id="csvInput" accept=".csv">
+                <br>
+                <button class="btn" id="loadBtn" disabled>Load & Display Data</button>
+                <button class="btn" id="loadDefaultBtn">Load Default File</button>
+                <button class="btn" id="clearBtn" disabled>Clear Data</button>
+            </div>
+
+            <div id="fileInfo"></div>
+            <div id="filterInfo"></div>
+            <div id="errorMessage"></div>
+
+            <div id="tableContainer">
+                <div class="no-data">No CSV file loaded. Please upload a file to begin analysis.</div>
+            </div>
+            
+            <!-- Large Dataset Section -->
+            <div class="large-dataset-section" style="margin-top: 40px;">
+                <h3>Large Dataset Viewer</h3>
+                <div class="upload-section">
+                    <h4>Upload Large CSV File (35k+ rows)</h4>
+                    <input type="file" id="largeCsvInput" accept=".csv">
+                    <br>
+                    <button class="btn" id="loadLargeBtn" disabled>Load Large Dataset</button>
+                    <button class="btn" id="loadDefaultLargeBtn">Load Default File</button>
+                    <button class="btn" id="clearLargeBtn" disabled>Clear Large Dataset</button>
+                </div>
+
+                <div id="largeFileInfo"></div>
+                <div id="largeErrorMessage"></div>
+
+                <div id="largeTableContainer">
+                    <div class="no-data">No large CSV file loaded. Upload a file to view top 100 rows with synchronized filtering.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="chart-title">Category Distribution</div>
+            <div class="chart-instructions">Click on bars to filter table data, click outside bars to show all</div>
+            <div class="filter-controls">
+                <button class="filter-btn" id="showAllBtn" disabled>Show All Data</button>
+            </div>
+            <div id="chartContainer">
+                <div class="no-chart">Upload and load a CSV file to see category distribution</div>
+            </div>
+            
+            <div class="chart-title" style="margin-top: 40px;">Issuer Distribution</div>
+            <div class="chart-instructions">Click on bars to filter table data, click outside bars to show all</div>
+            <div class="filter-controls">
+                <button class="filter-btn" id="showAllIssuerBtn" disabled>Show All Data</button>
+            </div>
+            <div id="issuerChartContainer">
+                <div class="no-chart">Upload and load a CSV file to see issuer distribution</div>
+            </div>
+            
+            <div class="chart-title" id="comparisonChartTitle" style="margin-top: 40px;">Issuer Proposal Comparison</div>
+            <div class="chart-instructions">Stacked bars showing rejected (ForRatio < 0.5) vs approved (ForRatio >= 0.5) counts by issuer</div>
+            <div class="filter-controls">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #2c3e50;">
+                    <input type="checkbox" id="mgmtProposalFilter" style="margin: 0;">
+                    Show management proposal only
+                </label>
+            </div>
+            <div id="comparisonChartContainer">
+                <div class="no-chart">Upload both datasets to see issuer proposal comparison</div>
+            </div>
+        </div>
+    </div>
+
+    <script>        let csvData = [];
+        let headers = [];
+        let categoryChart = null;
+        let issuerChart = null;
+        let comparisonChart = null;
+        let filteredData = [];
+        let categoryCol = null;
+        let subcategoryCol = null;
+        let issuerCol = null;
+        let selectedCategoryIndex = -1;
+        let selectedIssuerIndex = -1;
+
+        // Large dataset variables
+        let largeCsvData = [];
+        let largeHeaders = [];
+        let largeFilteredData = [];
+        let largeCategoryCol = null;
+        let largeSubcategoryCol = null;
+        let largeIssuerCol = null;
+
+        // Debouncing for chart regeneration
+        let chartRegenerationTimeout = null;
+
+        // File input change handler
+        document.getElementById('csvInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                document.getElementById('loadBtn').disabled = true;
+                return;
+            }
+
+            // Enable load button when file is selected
+            document.getElementById('loadBtn').disabled = false;
+            
+            // Clear previous messages
+            document.getElementById('fileInfo').innerHTML = '';
+            document.getElementById('errorMessage').innerHTML = '';
+        });
+
+        // Large CSV file input change handler
+        document.getElementById('largeCsvInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                document.getElementById('loadLargeBtn').disabled = true;
+                return;
+            }
+
+            // Enable load button when file is selected
+            document.getElementById('loadLargeBtn').disabled = false;
+            
+            // Clear previous messages
+            document.getElementById('largeFileInfo').innerHTML = '';
+            document.getElementById('largeErrorMessage').innerHTML = '';
+        });
+
+        // Load button click handler
+        document.getElementById('loadBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('csvInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Please select a CSV file first.');
+                return;
+            }
+
+            // Show loading state
+            this.disabled = true;
+            this.textContent = 'Loading...';
+
+            // Parse CSV file
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        showError('Error parsing CSV: ' + results.errors[0].message);
+                        document.getElementById('loadBtn').disabled = false;
+                        document.getElementById('loadBtn').textContent = 'Load & Display Data';
+                        return;
+                    }
+
+                    csvData = results.data;
+                    headers = results.meta.fields;
+                    
+                    if (csvData.length === 0) {
+                        showError('The CSV file appears to be empty or contains no valid data.');
+                        document.getElementById('loadBtn').disabled = false;
+                        document.getElementById('loadBtn').textContent = 'Load & Display Data';
+                        return;
+                    }
+
+                    // Show file info
+                    showFileInfo(file.name, csvData.length, headers.length);
+                    
+                    // Initialize filtered data to show all data
+                    filteredData = [...csvData];
+                    
+                    // Render table
+                    renderFilteredTable();
+                    
+                    // Generate and display chart
+                    generateCategoryChart();
+                    
+                    // Generate and display issuer chart
+                    generateIssuerChart();
+                    
+                    // Generate comparison chart if large dataset is available
+                    generateComparisonChart();
+                    
+                    // Update button states
+                    document.getElementById('loadBtn').disabled = false;
+                    document.getElementById('loadBtn').textContent = 'Load & Display Data';
+                    document.getElementById('clearBtn').disabled = false;
+                    document.getElementById('showAllBtn').disabled = false;
+                    document.getElementById('showAllIssuerBtn').disabled = false;
+                },
+                error: function(error) {
+                    showError('Failed to read CSV file: ' + error.message);
+                    document.getElementById('loadBtn').disabled = false;
+                    document.getElementById('loadBtn').textContent = 'Load & Display Data';
+                }
+            });
+        });
+
+        // Show All button click handler
+        document.getElementById('showAllBtn').addEventListener('click', function() {
+            showAllRows();
+        });
+
+        // Show All Issuer button click handler
+        document.getElementById('showAllIssuerBtn').addEventListener('click', function() {
+            showAllRows();
+        });
+
+        // Management proposal filter checkbox handler
+        document.getElementById('mgmtProposalFilter').addEventListener('change', function() {
+            // Regenerate comparison chart with new filter setting
+            generateComparisonChart();
+        });
+
+        // Large dataset load button click handler
+        document.getElementById('loadLargeBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('largeCsvInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showLargeError('Please select a CSV file first.');
+                return;
+            }
+
+            // Show loading state
+            this.disabled = true;
+            this.textContent = 'Loading...';
+
+            // Parse CSV file
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        showLargeError('Error parsing CSV: ' + results.errors[0].message);
+                        document.getElementById('loadLargeBtn').disabled = false;
+                        document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
+                        return;
+                    }
+
+                    largeCsvData = results.data;
+                    largeHeaders = results.meta.fields;
+                    
+                    if (largeCsvData.length === 0) {
+                        showLargeError('The CSV file appears to be empty or contains no valid data.');
+                        document.getElementById('loadLargeBtn').disabled = false;
+                        document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
+                        return;
+                    }
+
+                    // Show file info
+                    showLargeFileInfo(file.name, largeCsvData.length, largeHeaders.length);
+                    
+                    // Initialize filtered data to show all data
+                    largeFilteredData = [...largeCsvData];
+                    
+                    // Find columns for filtering
+                    largeCategoryCol = largeHeaders.find(h => h.toLowerCase().includes('category') && !h.toLowerCase().includes('sub')) || null;
+                    largeSubcategoryCol = largeHeaders.find(h => h.toLowerCase().includes('subcategory') || h.toLowerCase().includes('sub')) || null;
+                    largeIssuerCol = largeHeaders.find(h => h.toLowerCase().includes('issuer') || h.toLowerCase().includes('company') || h.toLowerCase().includes('firm')) || null;
+                    
+                    // Render table (top 100 rows)
+                    renderLargeFilteredTable();
+                    
+                    // Apply current filters if any exist
+                    if (window.selectedCategoryKey || window.selectedIssuerKey) {
+                        applyFiltersToLargeDataset();
+                    }
+                    
+                    // Generate comparison chart if rejected dataset is available
+                    generateComparisonChart();
+                    
+                    // Update button states
+                    document.getElementById('loadLargeBtn').disabled = false;
+                    document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
+                    document.getElementById('clearLargeBtn').disabled = false;
+                },
+                error: function(error) {
+                    showLargeError('Failed to read CSV file: ' + error.message);
+                    document.getElementById('loadLargeBtn').disabled = false;
+                    document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
+                }
+            });
+        });
+
+        // Clear large dataset button click handler
+        document.getElementById('clearLargeBtn').addEventListener('click', function() {
+            largeCsvData = [];
+            largeHeaders = [];
+            largeFilteredData = [];
+            largeCategoryCol = null;
+            largeSubcategoryCol = null;
+            largeIssuerCol = null;
+            document.getElementById('largeTableContainer').innerHTML = '<div class="no-data">No large CSV file loaded. Upload a file to view top 100 rows with synchronized filtering.</div>';
+            document.getElementById('largeFileInfo').innerHTML = '';
+            document.getElementById('largeErrorMessage').innerHTML = '';
+            document.getElementById('largeCsvInput').value = '';
+            document.getElementById('loadLargeBtn').disabled = true;
+            document.getElementById('clearLargeBtn').disabled = true;
+            
+            // Regenerate comparison chart
+            generateComparisonChart();
+        });
+
+        // Clear button click handler
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            csvData = [];
+            headers = [];
+            filteredData = [];
+            categoryCol = null;
+            subcategoryCol = null;
+            issuerCol = null;
+            selectedCategoryIndex = -1;
+            selectedIssuerIndex = -1;
+            document.getElementById('tableContainer').innerHTML = '<div class="no-data">No CSV file loaded. Please upload a file to begin analysis.</div>';
+            document.getElementById('fileInfo').innerHTML = '';
+            hideFilterInfo();
+            document.getElementById('errorMessage').innerHTML = '';
+            document.getElementById('csvInput').value = '';
+            document.getElementById('loadBtn').disabled = true;
+            document.getElementById('clearBtn').disabled = true;
+            document.getElementById('showAllBtn').disabled = true;
+            document.getElementById('showAllIssuerBtn').disabled = true;
+            
+            // Clear chart
+            categoryChart = safeDestroyChart(categoryChart);
+            issuerChart = safeDestroyChart(issuerChart);
+            comparisonChart = safeDestroyChart(comparisonChart);
+            document.getElementById('chartContainer').innerHTML = '<div class="no-chart">Upload and load a CSV file to see category distribution</div>';
+            document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">Upload and load a CSV file to see issuer distribution</div>';
+            document.getElementById('comparisonChartContainer').innerHTML = '<div class="no-chart">Upload both datasets to see issuer proposal comparison</div>';
+        });
+
+        function generateCategoryChart() {
+            // Find category and subcategory columns (case-insensitive)
+            categoryCol = headers.find(h => h.toLowerCase().includes('category') && !h.toLowerCase().includes('sub')) || null;
+            subcategoryCol = headers.find(h => h.toLowerCase().includes('subcategory') || h.toLowerCase().includes('sub')) || null;
+            
+            if (!categoryCol) {
+                document.getElementById('chartContainer').innerHTML = '<div class="no-chart">No category column found in the data</div>';
+                return;
+            }
+
+            // Aggregate data by [category, subcategory] from the appropriate dataset
+            const dataToAggregate = (window.selectedIssuerKey && !window.selectedCategoryKey) ? 
+                csvData.filter(row => {
+                    const rowIssuer = row[issuerCol] || 'Unknown';
+                    return rowIssuer === window.selectedIssuerKey;
+                }) : csvData;
+            
+            const aggregation = {};
+            dataToAggregate.forEach(row => {
+                const category = row[categoryCol] || 'Unknown';
+                const subcategory = subcategoryCol ? (row[subcategoryCol] || 'Unknown') : 'N/A';
+                const key = subcategoryCol ? `${category} | ${subcategory}` : category;
+                
+                aggregation[key] = (aggregation[key] || 0) + 1;
+            });
+
+            // Sort by count (descending) and get top 20 to avoid overcrowding
+            const sortedData = Object.entries(aggregation)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20);
+
+            if (sortedData.length === 0) {
+                document.getElementById('chartContainer').innerHTML = '<div class="no-chart">No valid category data found</div>';
+                return;
+            }
+
+            // Prepare chart data
+            const labels = sortedData.map(item => item[0]);
+            const counts = sortedData.map(item => item[1]);
+
+            // Generate colors with proper index mapping
+            let highlightIndex = -1;
+            if (window.selectedCategoryKey) {
+                highlightIndex = labels.findIndex(label => label === window.selectedCategoryKey);
+            }
+            const colors = generateColors(labels.length, highlightIndex);                // Clear previous chart
+                categoryChart = safeDestroyChart(categoryChart);
+
+            // Create canvas element
+            document.getElementById('chartContainer').innerHTML = '<canvas id="categoryChartCanvas"></canvas>';
+            const ctx = document.getElementById('categoryChartCanvas').getContext('2d');                // Create horizontal bar chart
+                categoryChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Count',
+                            data: counts,
+                            backgroundColor: colors.background,
+                            borderColor: colors.border,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y', // This makes it horizontal
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Count: ${context.parsed.x}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    maxTicksLimit: 20,
+                                    font: {
+                                        size: 10
+                                    }
+                                }
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                left: 10,
+                                right: 10,
+                                top: 10,
+                                bottom: 10
+                            }
+                        },
+                        onClick: (event, elements) => {
+                            try {
+                                handleChartClick(event, elements, labels, 'category');
+                            } catch (error) {
+                                console.error('Error in category chart click handler:', error);
+                            }
+                        }
+                    }
+                });
+        }
+
+        function generateIssuerChart() {
+            // Find issuer column (case-insensitive)
+            issuerCol = headers.find(h => h.toLowerCase().includes('issuer') || h.toLowerCase().includes('company') || h.toLowerCase().includes('firm')) || null;
+            
+            if (!issuerCol) {
+                document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">No issuer column found in the data</div>';
+                return;
+            }
+
+            // Aggregate data by issuer from the appropriate dataset
+            const dataToAggregate = (window.selectedCategoryKey && !window.selectedIssuerKey) ? 
+                csvData.filter(row => {
+                    const rowCategory = row[categoryCol] || 'Unknown';
+                    const rowSubcategory = subcategoryCol ? (row[subcategoryCol] || 'Unknown') : null;
+                    
+                    if (subcategoryCol && window.selectedCategoryKey.includes(' | ')) {
+                        const parts = window.selectedCategoryKey.split(' | ');
+                        const targetCategory = parts[0];
+                        const targetSubcategory = parts[1];
+                        return rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                    } else {
+                        return rowCategory === window.selectedCategoryKey;
+                    }
+                }) : csvData;
+            
+            const aggregation = {};
+            dataToAggregate.forEach(row => {
+                const issuer = row[issuerCol] || 'Unknown';
+                aggregation[issuer] = (aggregation[issuer] || 0) + 1;
+            });
+
+            // Sort by count (descending) and get top 20 to avoid overcrowding
+            const sortedData = Object.entries(aggregation)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20);
+
+            if (sortedData.length === 0) {
+                document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">No valid issuer data found</div>';
+                return;
+            }
+
+            // Prepare chart data
+            const labels = sortedData.map(item => item[0]);
+            const counts = sortedData.map(item => item[1]);
+
+            // Generate colors with proper index mapping
+            let highlightIndex = -1;
+            if (window.selectedIssuerKey) {
+                highlightIndex = labels.findIndex(label => label === window.selectedIssuerKey);
+            }
+            const colors = generateColors(labels.length, highlightIndex);
+
+            // Clear previous chart
+            issuerChart = safeDestroyChart(issuerChart);
+
+            // Create canvas element
+            document.getElementById('issuerChartContainer').innerHTML = '<canvas id="issuerChartCanvas"></canvas>';
+            const ctx = document.getElementById('issuerChartCanvas').getContext('2d');
+
+            // Create horizontal bar chart
+            issuerChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Count',
+                        data: counts,
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // This makes it horizontal
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Count: ${context.parsed.x}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            },
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                maxTicksLimit: 20,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 10
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        try {
+                            handleChartClick(event, elements, labels, 'issuer');
+                        } catch (error) {
+                            console.error('Error in issuer chart click handler:', error);
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateComparisonChart() {
+            // Only generate if both datasets are loaded
+            if (!csvData.length || !largeCsvData.length || !issuerCol || !largeIssuerCol) {
+                document.getElementById('comparisonChartContainer').innerHTML = '<div class="no-chart">Upload both datasets to see issuer proposal comparison</div>';
+                // Reset title
+                document.getElementById('comparisonChartTitle').textContent = 'Issuer Proposal Comparison';
+                return;
+            }
+
+            // Update title based on category filter
+            let titleText = 'Issuer Proposal Comparison';
+            if (window.selectedCategoryKey) {
+                titleText += ` - ${window.selectedCategoryKey}`;
+            }
+            document.getElementById('comparisonChartTitle').textContent = titleText;
+
+            // Determine which data to aggregate based on current filters
+            let smallDataToAggregate = csvData;
+            let largeDataToAggregate = largeCsvData;
+            
+            // Apply category filtering if selected
+            if (window.selectedCategoryKey) {
+                smallDataToAggregate = csvData.filter(row => {
+                    const rowCategory = row[categoryCol] || 'Unknown';
+                    const rowSubcategory = subcategoryCol ? (row[subcategoryCol] || 'Unknown') : null;
+                    
+                    if (subcategoryCol && window.selectedCategoryKey.includes(' | ')) {
+                        const parts = window.selectedCategoryKey.split(' | ');
+                        const targetCategory = parts[0];
+                        const targetSubcategory = parts[1];
+                        return rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                    } else {
+                        return rowCategory === window.selectedCategoryKey;
+                    }
+                });
+                
+                largeDataToAggregate = largeCsvData.filter(row => {
+                    const rowCategory = row[largeCategoryCol] || 'Unknown';
+                    const rowSubcategory = largeSubcategoryCol ? (row[largeSubcategoryCol] || 'Unknown') : null;
+                    
+                    if (largeSubcategoryCol && window.selectedCategoryKey.includes(' | ')) {
+                        const parts = window.selectedCategoryKey.split(' | ');
+                        const targetCategory = parts[0];
+                        const targetSubcategory = parts[1];
+                        return rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                    } else {
+                        return rowCategory === window.selectedCategoryKey;
+                    }
+                });
+            }
+            
+            // Apply issuer filtering if selected (hide all other issuers)
+            if (window.selectedIssuerKey) {
+                smallDataToAggregate = smallDataToAggregate.filter(row => {
+                    const rowIssuer = row[issuerCol] || 'Unknown';
+                    return rowIssuer === window.selectedIssuerKey;
+                });
+                
+                largeDataToAggregate = largeDataToAggregate.filter(row => {
+                    const rowIssuer = row[largeIssuerCol] || 'Unknown';
+                    return rowIssuer === window.selectedIssuerKey;
+                });
+            }
+
+            // Apply management proposal filter if checkbox is checked
+            const mgmtFilterCheckbox = document.getElementById('mgmtProposalFilter');
+            if (mgmtFilterCheckbox && mgmtFilterCheckbox.checked) {
+                // Find proposal_type column in large dataset
+                const proposalTypeColumn = Object.keys(largeCsvData[0] || {}).find(col => 
+                    col.toLowerCase().includes('proposal_type') || col.toLowerCase().includes('proposaltype')
+                );
+                
+                if (proposalTypeColumn) {
+                    largeDataToAggregate = largeDataToAggregate.filter(row => {
+                        const proposalType = row[proposalTypeColumn] || '';
+                        return proposalType.trim().toUpperCase() === 'MG';
+                    });
+                }
+            }
+
+            // Find ForRatioAmongVoted_true column in large dataset
+            const forRatioColumn = Object.keys(largeCsvData[0] || {}).find(col => 
+                col.toLowerCase().includes('forratio') && col.toLowerCase().includes('true')
+            );
+            
+            if (!forRatioColumn) {
+                document.getElementById('comparisonChartContainer').innerHTML = '<div class="no-chart">ForRatioAmongVoted_true column not found in large dataset</div>';
+                return;
+            }
+
+            // Aggregate large dataset by issuer using ForRatioAmongVoted_true threshold
+            const rejectedAggregation = {};
+            const approvedAggregation = {};
+            
+            largeDataToAggregate.forEach(row => {
+                const issuer = row[largeIssuerCol] || 'Unknown';
+                const forRatio = parseFloat(row[forRatioColumn]);
+                
+                if (!isNaN(forRatio)) {
+                    if (forRatio < 0.5) {
+                        // Rejected: ForRatioAmongVoted_true < 0.5
+                        rejectedAggregation[issuer] = (rejectedAggregation[issuer] || 0) + 1;
+                    } else {
+                        // Approved: ForRatioAmongVoted_true >= 0.5
+                        approvedAggregation[issuer] = (approvedAggregation[issuer] || 0) + 1;
+                    }
+                }
+            });
+
+            // Also aggregate small dataset (contains only rejected proposals) for reference
+            const smallRejectedAggregation = {};
+            smallDataToAggregate.forEach(row => {
+                const issuer = row[issuerCol] || 'Unknown';
+                smallRejectedAggregation[issuer] = (smallRejectedAggregation[issuer] || 0) + 1;
+            });
+
+            // Combine and prepare data for stacked bars
+            const combinedData = {};
+            
+            // Add all issuers from both aggregations
+            [...Object.keys(rejectedAggregation), ...Object.keys(approvedAggregation), ...Object.keys(smallRejectedAggregation)].forEach(issuer => {
+                if (!combinedData[issuer]) {
+                    combinedData[issuer] = {
+                        rejected: rejectedAggregation[issuer] || 0,
+                        approved: approvedAggregation[issuer] || 0,
+                        smallRejected: smallRejectedAggregation[issuer] || 0
+                    };
+                }
+            });
+
+            // Sort by rejected count (descending)
+            const sortedIssuers = Object.entries(combinedData)
+                .sort((a, b) => b[1].rejected - a[1].rejected)
+                .slice(0, 20); // Limit to top 20
+
+            if (sortedIssuers.length === 0) {
+                document.getElementById('comparisonChartContainer').innerHTML = '<div class="no-chart">No valid issuer data found for comparison</div>';
+                return;
+            }
+
+            // Prepare chart data
+            const labels = sortedIssuers.map(item => item[0]);
+            const rejectedCounts = sortedIssuers.map(item => item[1].rejected);
+            const approvedCounts = sortedIssuers.map(item => item[1].approved);
+
+            // Clear previous chart
+            comparisonChart = safeDestroyChart(comparisonChart);
+
+            // Create canvas element
+            document.getElementById('comparisonChartContainer').innerHTML = '<canvas id="comparisonChartCanvas"></canvas>';
+            const ctx = document.getElementById('comparisonChartCanvas').getContext('2d');
+
+            // Create stacked horizontal bar chart
+            comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Rejected (ForRatio < 0.5)',
+                            data: rejectedCounts,
+                            backgroundColor: '#e74c3c80',
+                            borderColor: '#e74c3c',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Approved (ForRatio >= 0.5)',
+                            data: approvedCounts,
+                            backgroundColor: '#27ae6080',
+                            borderColor: '#27ae60',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // This makes it horizontal
+                    scales: {
+                        x: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            },
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            ticks: {
+                                maxTicksLimit: 20,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const issuer = context.label;
+                                    const data = combinedData[issuer];
+                                    if (context.datasetIndex === 0) {
+                                        const smallRef = data.smallRejected > 0 ? ` (Small dataset: ${data.smallRejected})` : '';
+                                        return `Rejected (ForRatio < 0.5): ${data.rejected}${smallRef}`;
+                                    } else {
+                                        return `Approved (ForRatio >= 0.5): ${data.approved}`;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 10
+                        }
+                    },
+                    onHover: (event, activeElements) => {
+                        // Change cursor on hover
+                        event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+                    },
+                    animation: {
+                        onComplete: function(animation) {
+                            try {
+                                // Draw rejection percentages at the end of bars
+                                const chart = animation.chart;
+                                const ctx = chart.ctx;
+                                const chartArea = chart.chartArea;
+                                
+                                if (!ctx || !chartArea) {
+                                    console.warn('Chart context or chart area not available');
+                                    return;
+                                }
+                                
+                                ctx.save();
+                                ctx.font = '10px Arial';
+                                ctx.fillStyle = '#666';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                
+                                labels.forEach((label, index) => {
+                                    try {
+                                        const data = combinedData[label];
+                                        if (!data) return;
+                                        
+                                        const totalProposals = data.rejected + data.approved;
+                                        const rejectionPercentage = totalProposals > 0 ? ((data.rejected / totalProposals) * 100).toFixed(1) : '0.0';
+                                        
+                                        // Get the bar position
+                                        const meta = chart.getDatasetMeta(0);
+                                        const secondMeta = chart.getDatasetMeta(1);
+                                        
+                                        if (!meta || !secondMeta || !meta.data[index] || !secondMeta.data[index]) {
+                                            return;
+                                        }
+                                        
+                                        const bar = meta.data[index];
+                                        const secondBar = secondMeta.data[index];
+                                        
+                                        // Calculate the end position of the stacked bar
+                                        const totalWidth = Math.max(bar.x, secondBar.x);
+                                        const yPosition = bar.y;
+                                        
+                                        // Draw percentage text at the end of the bar
+                                        ctx.fillText(`${rejectionPercentage}%`, totalWidth + 5, yPosition);
+                                    } catch (e) {
+                                        console.warn('Error drawing percentage for label:', label, e);
+                                    }
+                                });
+                                
+                                ctx.restore();
+                            } catch (error) {
+                                console.error('Error in chart animation callback:', error);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateColors(count, highlightIndex = -1) {
+            const background = [];
+            const border = [];
+            const darkBlue = '#2c3e50'; // Dark blue color
+            const highlightColor = '#e74c3c'; // Red color for highlighting
+            
+            for (let i = 0; i < count; i++) {
+                if (i === highlightIndex) {
+                    background.push(highlightColor + '80'); // Add transparency to highlight color
+                    border.push(highlightColor);
+                } else {
+                    background.push(darkBlue + '80'); // Add transparency
+                    border.push(darkBlue);
+                }
+            }
+
+            return { background, border };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showFileInfo(filename, rowCount, columnCount) {
+            const infoDiv = document.getElementById('fileInfo');
+            infoDiv.innerHTML = `
+                <div class="file-info">
+                    <strong>File loaded successfully:</strong> ${escapeHtml(filename)}<br>
+                    <strong>Rows:</strong> ${rowCount} | <strong>Columns:</strong> ${columnCount}
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(message)}</div>`;
+        }
+
+        function showFilterInfo(filterKey, filteredCount) {
+            const filterDiv = document.getElementById('filterInfo');
+            filterDiv.innerHTML = `
+                <strong>Filtered by:</strong> ${escapeHtml(filterKey)}<br>
+                <strong>Highlighted Rows:</strong> ${filteredCount} | <strong>Columns:</strong> ${headers.length}
+            `;
+            filterDiv.style.display = 'block';
+        }
+
+        function hideFilterInfo() {
+            const filterDiv = document.getElementById('filterInfo');
+            filterDiv.style.display = 'none';
+        }
+
+        function handleChartClick(event, elements, labels, chartType) {
+            if (elements.length > 0) {
+                // Bar was clicked - filter by the selected category/subcategory or issuer
+                const clickedIndex = elements[0].index;
+                const selectedKey = labels[clickedIndex];
+                
+                console.log('Chart clicked:', chartType, 'Key:', selectedKey);
+                
+                if (chartType === 'category') {
+                    selectedCategoryIndex = clickedIndex;
+                    filterTableByCombined(selectedKey, null);
+                } else if (chartType === 'issuer') {
+                    selectedIssuerIndex = clickedIndex;
+                    filterTableByCombined(null, selectedKey);
+                }
+                
+                // Use debounced regeneration to avoid race conditions
+                regenerateChartsDebounced();
+            } else {
+                // Clicked outside any bar - show all data
+                showAllRows();
+            }
+        }
+
+        function filterTableByCombined(categoryKey, issuerKey) {
+            // Store the selected keys globally for reference
+            window.selectedCategoryKey = categoryKey || window.selectedCategoryKey;
+            window.selectedIssuerKey = issuerKey || window.selectedIssuerKey;
+            
+            // Filter the data based on both criteria if available
+            filteredData = csvData.filter(row => {
+                let matchesCategory = true;
+                let matchesIssuer = true;
+                
+                // Check category filter
+                if (window.selectedCategoryKey) {
+                    const rowCategory = row[categoryCol] || 'Unknown';
+                    const rowSubcategory = subcategoryCol ? (row[subcategoryCol] || 'Unknown') : null;
+                    
+                    if (subcategoryCol && window.selectedCategoryKey.includes(' | ')) {
+                        const parts = window.selectedCategoryKey.split(' | ');
+                        const targetCategory = parts[0];
+                        const targetSubcategory = parts[1];
+                        matchesCategory = rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                    } else {
+                        matchesCategory = rowCategory === window.selectedCategoryKey;
+                    }
+                }
+                
+                // Check issuer filter
+                if (window.selectedIssuerKey) {
+                    const rowIssuer = row[issuerCol] || 'Unknown';
+                    matchesIssuer = rowIssuer === window.selectedIssuerKey;
+                }
+                
+                return matchesCategory && matchesIssuer;
+            });
+
+            // Re-render table with filtered data
+            renderFilteredTable();
+            
+            // Apply same filters to large dataset if loaded
+            if (largeCsvData.length > 0) {
+                applyFiltersToLargeDataset();
+            }
+            
+            // Update filter info
+            let filterText = '';
+            if (window.selectedCategoryKey && window.selectedIssuerKey) {
+                filterText = `Category: ${window.selectedCategoryKey} & Issuer: ${window.selectedIssuerKey}`;
+            } else if (window.selectedCategoryKey) {
+                filterText = `Category: ${window.selectedCategoryKey}`;
+            } else if (window.selectedIssuerKey) {
+                filterText = `Issuer: ${window.selectedIssuerKey}`;
+            }
+            
+            if (filterText) {
+                showFilterInfo(filterText, filteredData.length);
+                
+                // Update chart titles
+                const chartTitles = document.querySelectorAll('.chart-title');
+                chartTitles[0].textContent = `Category Distribution - ${filterText}`;
+                if (chartTitles[1]) {
+                    chartTitles[1].textContent = `Issuer Distribution - ${filterText}`;
+                }
+            }
+        }
+
+        function filterTableByCategory(selectedKey) {
+            // Parse the key to extract category and subcategory
+            let targetCategory, targetSubcategory;
+            
+            if (subcategoryCol && selectedKey.includes(' | ')) {
+                const parts = selectedKey.split(' | ');
+                targetCategory = parts[0];
+                targetSubcategory = parts[1];
+            } else {
+                targetCategory = selectedKey;
+                targetSubcategory = null;
+            }
+
+            // Filter the data
+            filteredData = csvData.filter(row => {
+                const rowCategory = row[categoryCol] || 'Unknown';
+                const rowSubcategory = subcategoryCol ? (row[subcategoryCol] || 'Unknown') : null;
+                
+                if (subcategoryCol && targetSubcategory) {
+                    return rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                } else {
+                    return rowCategory === targetCategory;
+                }
+            });
+
+            // Re-render table with filtered data
+            renderFilteredTable();
+            
+            // Update filter info
+            showFilterInfo(`Category: ${selectedKey}`, filteredData.length);
+            
+            // Update chart title to show filter
+            document.querySelector('.chart-title').textContent = `Category Distribution - Filtered by: ${selectedKey}`;
+        }
+
+        function filterTableByIssuer(selectedKey) {
+            // Filter the data by issuer
+            filteredData = csvData.filter(row => {
+                const rowIssuer = row[issuerCol] || 'Unknown';
+                return rowIssuer === selectedKey;
+            });
+
+            // Re-render table with filtered data
+            renderFilteredTable();
+            
+            // Update filter info
+            showFilterInfo(`Issuer: ${selectedKey}`, filteredData.length);
+            
+            // Update chart title to show filter
+            const chartTitles = document.querySelectorAll('.chart-title');
+            chartTitles[1].textContent = `Issuer Distribution - Filtered by: ${selectedKey}`;
+        }
+
+        function showAllRows() {
+            filteredData = [...csvData];
+            selectedCategoryIndex = -1;
+            selectedIssuerIndex = -1;
+            window.selectedCategoryKey = null;
+            window.selectedIssuerKey = null;
+            renderFilteredTable();
+            hideFilterInfo();
+            
+            // Also reset large dataset if loaded
+            if (largeCsvData.length > 0) {
+                largeFilteredData = [...largeCsvData];
+                renderLargeFilteredTable();
+            }
+            
+            const chartTitles = document.querySelectorAll('.chart-title');
+            chartTitles[0].textContent = 'Category Distribution';
+            if (chartTitles[1]) {
+                chartTitles[1].textContent = 'Issuer Distribution';
+            }
+            // Regenerate both charts to clear highlighting
+            regenerateChartsDebounced();
+        }
+
+        function renderFilteredTable() {
+            const container = document.getElementById('tableContainer');
+            
+            if (!filteredData.length || !headers.length) {
+                container.innerHTML = '<div class="no-data">No data matches the selected filter.</div>';
+                return;
+            }
+
+            let html = '<table><thead><tr>';
+            
+            // Create header row with special classes
+            headers.forEach(header => {
+                const lowerHeader = header.toLowerCase();
+                let headerClass = '';
+                
+                if (lowerHeader.includes('proposal')) {
+                    headerClass = 'proposal-header';
+                } else if (lowerHeader.includes('category')) {
+                    headerClass = 'category-header';
+                } else if (lowerHeader.includes('issuer') || lowerHeader.includes('company')) {
+                    headerClass = 'issuer-header';
+                }
+                
+                html += `<th class="${headerClass}">${escapeHtml(header)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            // Create data rows from filtered data with appropriate styling
+            filteredData.forEach((row, index) => {
+                html += '<tr>';
+                headers.forEach(header => {
+                    const cellValue = row[header] || '';
+                    const lowerHeader = header.toLowerCase();
+                    let cellClass = '';
+                    
+                    if (lowerHeader.includes('proposal')) {
+                        cellClass = 'proposal-cell';
+                    } else if (lowerHeader.includes('category')) {
+                        cellClass = 'category-cell';
+                    } else if (lowerHeader.includes('issuer') || lowerHeader.includes('company')) {
+                        cellClass = 'issuer-cell';
+                    } else if (lowerHeader.includes('ratio') || lowerHeader.includes('percent') || 
+                              lowerHeader.includes('count') || lowerHeader.includes('number') ||
+                              !isNaN(parseFloat(cellValue))) {
+                        cellClass = 'numeric-cell';
+                    }
+                    
+                    html += `<td class="${cellClass}">${escapeHtml(cellValue)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ...existing code...
+
+        // Helper function to safely destroy charts
+        function safeDestroyChart(chart) {
+            if (chart && chart.destroy) {
+                try {
+                    chart.destroy();
+                } catch (error) {
+                    console.warn('Error destroying chart:', error);
+                }
+            }
+            return null;
+        }
+
+        // Debounced chart regeneration to prevent race conditions
+        function regenerateChartsDebounced() {
+            if (chartRegenerationTimeout) {
+                clearTimeout(chartRegenerationTimeout);
+            }
+            
+            chartRegenerationTimeout = setTimeout(() => {
+                try {
+                    console.log('Regenerating charts...');
+                    generateCategoryChart();
+                    generateIssuerChart();
+                    generateComparisonChart();
+                    console.log('Charts regenerated successfully');
+                } catch (error) {
+                    console.error('Error regenerating charts:', error);
+                }
+            }, 150);
+        }
+
+        // Large dataset helper functions
+        function showLargeFileInfo(filename, rowCount, columnCount) {
+            const infoDiv = document.getElementById('largeFileInfo');
+            infoDiv.innerHTML = `
+                <div class="dataset-info">
+                    <strong>Large dataset loaded:</strong> ${escapeHtml(filename)}<br>
+                    <strong>Total Rows:</strong> ${rowCount} | <strong>Columns:</strong> ${columnCount}<br>
+                    <strong>Displaying:</strong> Top 100 rows with synchronized filtering
+                </div>
+            `;
+        }
+
+        function showLargeError(message) {
+            const errorDiv = document.getElementById('largeErrorMessage');
+            errorDiv.innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(message)}</div>`;
+        }
+
+        function applyFiltersToLargeDataset() {
+            if (!largeCsvData.length) return;
+            
+            largeFilteredData = largeCsvData.filter(row => {
+                let matchesCategory = true;
+                let matchesIssuer = true;
+                
+                // Check category filter
+                if (window.selectedCategoryKey && largeCategoryCol) {
+                    const rowCategory = row[largeCategoryCol] || 'Unknown';
+                    const rowSubcategory = largeSubcategoryCol ? (row[largeSubcategoryCol] || 'Unknown') : null;
+                    
+                    if (largeSubcategoryCol && window.selectedCategoryKey.includes(' | ')) {
+                        const parts = window.selectedCategoryKey.split(' | ');
+                        const targetCategory = parts[0];
+                        const targetSubcategory = parts[1];
+                        matchesCategory = rowCategory === targetCategory && rowSubcategory === targetSubcategory;
+                    } else {
+                        matchesCategory = rowCategory === window.selectedCategoryKey;
+                    }
+                }
+                
+                // Check issuer filter
+                if (window.selectedIssuerKey && largeIssuerCol) {
+                    const rowIssuer = row[largeIssuerCol] || 'Unknown';
+                    matchesIssuer = rowIssuer === window.selectedIssuerKey;
+                }
+                
+                return matchesCategory && matchesIssuer;
+            });
+
+            renderLargeFilteredTable();
+        }
+
+        function renderLargeFilteredTable() {
+            const container = document.getElementById('largeTableContainer');
+            
+            if (!largeFilteredData.length || !largeHeaders.length) {
+                container.innerHTML = '<div class="no-data">No data matches the selected filter in the large dataset.</div>';
+                return;
+            }
+
+            // Show only top 100 rows
+            const displayData = largeFilteredData.slice(0, 100);
+            
+            let html = '<table><thead><tr>';
+            
+            // Create header row with special classes
+            largeHeaders.forEach(header => {
+                const lowerHeader = header.toLowerCase();
+                let headerClass = '';
+                
+                if (lowerHeader.includes('proposal')) {
+                    headerClass = 'proposal-header';
+                } else if (lowerHeader.includes('category')) {
+                    headerClass = 'category-header';
+                } else if (lowerHeader.includes('issuer') || lowerHeader.includes('company')) {
+                    headerClass = 'issuer-header';
+                }
+                
+                html += `<th class="${headerClass}">${escapeHtml(header)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            // Create data rows from filtered data with appropriate styling
+            displayData.forEach((row, index) => {
+                html += '<tr>';
+                largeHeaders.forEach(header => {
+                    const cellValue = row[header] || '';
+                    const lowerHeader = header.toLowerCase();
+                    let cellClass = '';
+                    
+                    if (lowerHeader.includes('proposal')) {
+                        cellClass = 'proposal-cell';
+                    } else if (lowerHeader.includes('category')) {
+                        cellClass = 'category-cell';
+                    } else if (lowerHeader.includes('issuer') || lowerHeader.includes('company')) {
+                        cellClass = 'issuer-cell';
+                    } else if (lowerHeader.includes('ratio') || lowerHeader.includes('percent') || 
+                              lowerHeader.includes('count') || lowerHeader.includes('number') ||
+                              !isNaN(parseFloat(cellValue))) {
+                        cellClass = 'numeric-cell';
+                    }
+                    
+                    html += `<td class="${cellClass}">${escapeHtml(cellValue)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            
+            // Add summary info
+            if (largeFilteredData.length > 100) {
+                html += `<div class="dataset-info" style="margin-top: 10px;">
+                    Showing top 100 of ${largeFilteredData.length} filtered rows
+                </div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Default file loading functionality
+        document.getElementById('loadDefaultBtn').addEventListener('click', function() {
+            console.log('Load Default File button clicked');
+            
+            // Show loading state
+            this.disabled = true;
+            this.textContent = 'Loading...';
+            
+            loadDefaultFile('/default-peer-analysis', false)
+                .then(() => {
+                    console.log('Default file loaded successfully');
+                })
+                .catch((error) => {
+                    console.error('Failed to load default file:', error);
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = 'Load Default File';
+                });
+        });
+
+        document.getElementById('loadDefaultLargeBtn').addEventListener('click', function() {
+            console.log('Load Default Large File button clicked');
+            
+            // Show loading state
+            this.disabled = true;
+            this.textContent = 'Loading...';
+            
+            loadDefaultFile('/default-large-dataset', true)
+                .then(() => {
+                    console.log('Default large file loaded successfully');
+                })
+                .catch((error) => {
+                    console.error('Failed to load default large file:', error);
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = 'Load Default File';
+                });
+        });
+
+        async function loadDefaultFile(endpoint, isLargeDataset) {
+            console.log(`Loading default file from: ${endpoint}, isLargeDataset: ${isLargeDataset}`);
+            
+            return new Promise((resolve, reject) => {
+                fetch(endpoint)
+                    .then(response => {
+                        console.log(`Response status: ${response.status}, OK: ${response.ok}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(csvText => {
+                        console.log(`CSV text length: ${csvText.length}`);
+                        console.log('First 200 chars:', csvText.substring(0, 200));
+                        
+                        // Use Papa Parse to parse the CSV text
+                        Papa.parse(csvText, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: function(results) {
+                                console.log('Papa Parse complete:', {
+                                    dataLength: results.data.length,
+                                    errors: results.errors,
+                                    fields: results.meta.fields
+                                });
+                                
+                                if (results.errors.length > 0) {
+                                    console.error('Error parsing default CSV:', results.errors[0].message);
+                                    if (isLargeDataset) {
+                                        showLargeError('Error parsing default file: ' + results.errors[0].message);
+                                    } else {
+                                        showError('Error parsing default file: ' + results.errors[0].message);
+                                    }
+                                    reject(new Error('Papa Parse error: ' + results.errors[0].message));
+                                    return;
+                                }
+
+                                const parsedData = results.data;
+                                const filename = isLargeDataset ? 'Default Large Dataset' : 'Default Peer Analysis';
+                                
+                                console.log(`Loading ${filename} with ${parsedData.length} rows`);
+                                
+                                try {
+                                    if (isLargeDataset) {
+                                        loadLargeDatasetFromData(parsedData, filename);
+                                    } else {
+                                        loadDatasetFromData(parsedData, filename);
+                                    }
+                                    resolve();
+                                } catch (error) {
+                                    console.error('Error in load function:', error);
+                                    reject(error);
+                                }
+                            },
+                            error: function(error) {
+                                console.error('Papa Parse error:', error);
+                                if (isLargeDataset) {
+                                    showLargeError('Error parsing default file: ' + error.message);
+                                } else {
+                                    showError('Error parsing default file: ' + error.message);
+                                }
+                                reject(error);
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading default file:', error);
+                        if (isLargeDataset) {
+                            showLargeError('Error loading default file: ' + error.message);
+                        } else {
+                            showError('Error loading default file: ' + error.message);
+                        }
+                        reject(error);
+                    });
+            });
+        }
+
+        function loadDatasetFromData(parsedData, filename) {
+            if (parsedData.length === 0) {
+                showError('Default file is empty or invalid');
+                return;
+            }
+            
+            // Update global variables
+            csvData = parsedData;
+            headers = Object.keys(parsedData[0]);
+            
+            // Clear previous data and messages
+            document.getElementById('errorMessage').innerHTML = '';
+            
+            // Show file info
+            showFileInfo(filename, csvData.length, headers.length);
+            
+            // Initialize filtered data
+            filteredData = [...csvData];
+            
+            // Set columns for charts/filters
+            categoryCol = headers.find(h => h.toLowerCase().includes('category') && !h.toLowerCase().includes('sub')) || null;
+            subcategoryCol = headers.find(h => h.toLowerCase().includes('subcategory') || h.toLowerCase().includes('sub')) || null;
+            issuerCol = headers.find(h => h.toLowerCase().includes('issuer') || h.toLowerCase().includes('company') || h.toLowerCase().includes('firm')) || null;
+            
+            // Render table and charts
+            renderFilteredTable();
+            generateCategoryChart();
+            generateIssuerChart();
+            generateComparisonChart();
+            
+            // Update button states
+            document.getElementById('clearBtn').disabled = false;
+            document.getElementById('showAllBtn').disabled = false;
+            document.getElementById('showAllIssuerBtn').disabled = false;
+        }
+
+        function loadLargeDatasetFromData(parsedData, filename) {
+            if (parsedData.length === 0) {
+                showLargeError('Default large dataset file is empty or invalid');
+                return;
+            }
+            
+            // Update global variables
+            largeCsvData = parsedData;
+            largeHeaders = Object.keys(parsedData[0]);
+            
+            // Clear previous data and messages
+            document.getElementById('largeErrorMessage').innerHTML = '';
+            
+            // Show file info
+            showLargeFileInfo(filename, largeCsvData.length, largeHeaders.length);
+            
+            // Initialize filtered data
+            largeFilteredData = [...largeCsvData];
+            
+            // Find columns for filtering
+            largeCategoryCol = largeHeaders.find(h => h.toLowerCase().includes('category') && !h.toLowerCase().includes('sub')) || null;
+            largeSubcategoryCol = largeHeaders.find(h => h.toLowerCase().includes('subcategory') || h.toLowerCase().includes('sub')) || null;
+            largeIssuerCol = largeHeaders.find(h => h.toLowerCase().includes('issuer') || h.toLowerCase().includes('company') || h.toLowerCase().includes('firm')) || null;
+            
+            // Render table (top 100 rows)
+            renderLargeFilteredTable();
+            
+            // Apply current filters if any exist
+            if (window.selectedCategoryKey || window.selectedIssuerKey) {
+                applyFiltersToLargeDataset();
+            }
+            
+            // Generate comparison chart if rejected dataset is available
+            generateComparisonChart();
+            
+            // Update button states
+            document.getElementById('clearLargeBtn').disabled = false;
+        }
+    </script>
+</body>
+</html>

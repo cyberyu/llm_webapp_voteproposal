@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import csv
 import io
 from typing import List, Dict
@@ -20,6 +21,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add specific routes for HTML files BEFORE mounting static files
+@app.get("/peeranalysis.html")
+async def serve_peeranalysis():
+    return FileResponse("peeranalysis.html")
+
+@app.get("/webui.html") 
+async def serve_webui():
+    return FileResponse("webui.html")
+
+@app.get("/detail.html")
+async def serve_detail():
+    return FileResponse("detail.html")
+
+@app.get("/histrogram.html")
+async def serve_histogram():
+    return FileResponse("histrogram.html")
+
+@app.get("/")
+async def serve_index():
+    # Serve webui.html as the default page if index.html doesn't exist
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    else:
+        return FileResponse("webui.html")
+
+# Mount static files at /static instead of /
+app.mount("/static", StaticFiles(directory=".", html=True), name="static")
 
 uploaded_data = []
 progress_tracker = {}
@@ -270,3 +299,36 @@ async def plot_hist_2025(background_tasks: BackgroundTasks):
         ], cwd=os.path.dirname(__file__))
     background_tasks.add_task(run_script)
     return {"status": "started"}
+
+@app.get("/default-peer-analysis")
+async def serve_default_peer_analysis():
+    return FileResponse("df_peer_analysis_unfavorable_propsals.csv")
+
+@app.get("/default-large-dataset") 
+async def serve_default_large_dataset():
+    return FileResponse("df_peer_analysis_large_dataset.csv")
+
+@app.get("/hist_2025/{filename}")
+async def serve_hist_2025_image(filename: str):
+    """Serve histogram images from hist_2025 folder"""
+    image_path = os.path.join("hist_2025", filename)
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    else:
+        # List available files for debugging
+        if os.path.exists("hist_2025"):
+            available_files = [f for f in os.listdir("hist_2025") if f.endswith(".png")]
+            return JSONResponse({
+                "error": f"Histogram image {filename} not found", 
+                "available_files": available_files[:10]  # Show first 10 files
+            }, status_code=404)
+        else:
+            return JSONResponse({"error": "hist_2025 directory not found"}, status_code=404)
+
+@app.get("/histogram_image.png")
+async def serve_histogram_image():
+    """Serve default histogram image"""
+    if os.path.exists("histogram_image.png"):
+        return FileResponse("histogram_image.png")
+    else:
+        return JSONResponse({"error": "Default histogram image not found"}, status_code=404)

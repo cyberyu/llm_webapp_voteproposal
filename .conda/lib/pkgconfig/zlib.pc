@@ -1,0 +1,13 @@
+prefix=/usr/project/llm_webapp_voteproposal/.conda
+exec_prefix=/usr/project/llm_webapp_voteproposal/.conda
+libdir=/usr/project/llm_webapp_voteproposal/.conda/lib
+sharedlibdir=/usr/project/llm_webapp_voteproposal/.conda/lib
+includedir=/usr/project/llm_webapp_voteproposal/.conda/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.13
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

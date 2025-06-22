@@ -1,0 +1,7 @@
+prefix=/usr/project/llm_webapp_voteproposal/.conda
+includedir=${prefix}/include
+ 
+Name: KBProto
+Description: KB extension headers
+Version: 1.0.7
+Cflags: -I${includedir}

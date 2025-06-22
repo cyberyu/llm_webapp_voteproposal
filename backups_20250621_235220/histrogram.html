@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Histogram Aggregator</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; margin: 0; padding-top: 60px; }
+        /* Navigation Bar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            color: #ecf0f1;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-links a {
+            color: #bdc3c7;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .nav-links a:hover {
+            background: #34495e;
+            color: #ecf0f1;
+        }
+        .nav-links a.active {
+            background: #3498db;
+            color: white;
+            cursor: default;
+        }
+        .container { max-width: 1200px; margin: 32px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 12px #0001; padding: 32px; }
+        h2 { margin-top: 0; }
+        #tableScroll { overflow: auto; max-height: 400px; min-height: 80px; margin-bottom: 24px; border: 1px solid #e0e4ea; border-radius: 4px; background: #fafcff; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; }
+        th { background: #f3f6fa; }
+        .chart-container { display: flex; flex-wrap: wrap; gap: 32px; }
+        .histogram-box { 
+            background: #fafcff; border: 1px solid #e0e4ea; border-radius: 6px; padding: 18px; margin-bottom: 32px; width: 100%;
+            display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 2vw;
+        }
+        .histogram-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; text-align: center; }
+        .histogram-panel { width: 48%; min-width: 320px; }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">LLM WebApp</a>
+            <ul class="nav-links">
+                <li><a href="webui.html">Main Table</a></li>
+                <li><a href="detail.html">Detail Viewer</a></li>
+                <li><a href="histrogram.html" class="active">Histogram Analyzer</a></li>
+                <li><a href="peeranalysis.html">Peer Analysis</a></li>
+            </ul>
+        </div>
+    </nav>
+
+<div class="container">
+    <h2>Histogram Aggregator</h2>
+    <div style="margin-bottom:18px;display:flex;gap:18px;align-items:center;">
+        <label for="catSelect">Category:</label>
+        <select id="catSelect"></select>
+        <label for="subcatSelect">Subcategory:</label>
+        <select id="subcatSelect"></select>
+        <button id="showAllBtn">Show All</button>
+    </div>
+    <input type="file" id="csvInput" accept=".csv">
+    <button id="loadBtn">Load & Show Table</button>
+    <div id="tableScroll"><div id="tableContainer"><p class="no-data">No CSV loaded. Please upload a file.</p></div></div>
+    <div id="histContainer"></div>
+</div>
+<script>
+let rawRows = [], headers = [], loadedRows = [];
+let fileContent = null;
+
+document.getElementById('csvInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        fileContent = evt.target.result;
+        document.getElementById('loadBtn').disabled = false;
+        document.getElementById('tableContainer').innerHTML = '<p class="no-data">Click "Load & Show Table" to display the data.</p>';
+        document.getElementById('histContainer').innerHTML = '';
+    };
+    reader.readAsText(file);
+});
+
+document.getElementById('loadBtn').onclick = function() {
+    if (!fileContent) return;
+    Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            rawRows = results.data;
+            headers = results.meta.fields;
+            loadedRows = rawRows;
+            renderTable(loadedRows);
+        }
+    });
+};
+
+function renderTable(rows) {
+    const container = document.getElementById('tableContainer');
+    if (!rows.length) {
+        container.innerHTML = '<p class="no-data">No CSV loaded. Please upload a file.</p>';
+        return;
+    }
+    const keys = Object.keys(rows[0]);
+    let html = '<table><thead><tr>';
+    for (const key of keys) html += `<th>${key}</th>`;
+    html += '</tr></thead><tbody>';
+    const maxRows = 100;
+    for (let i = 0; i < Math.min(rows.length, maxRows); i++) {
+        html += '<tr>';
+        for (const key of keys) html += `<td>${rows[i][key]}</td>`;
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    if (rows.length > maxRows) {
+        html += `<div style='color:#888; font-size:13px; margin-top:6px;'>Showing first ${maxRows} of ${rows.length} rows. Table truncated for performance.</div>`;
+    }
+    container.innerHTML = html;
+}
+
+function filterAndRenderTable() {
+    if (!rawRows.length) return;
+    
+    const cat = catSelect.value;
+    const subcat = subcatSelect.value;
+    
+    // Filter rows based on selected category and subcategory
+    let filteredRows = rawRows;
+    if (cat && subcat) {
+        // Find the column names for category and subcategory (case-insensitive)
+        const catCol = headers.find(h => h.toLowerCase().includes('category')) || 'category';
+        const subcatCol = headers.find(h => h.toLowerCase().includes('subcategory')) || 'subcategory';
+        
+        filteredRows = rawRows.filter(row => {
+            const rowCat = row[catCol] || '';
+            const rowSubcat = row[subcatCol] || '';
+            return rowCat === cat && rowSubcat === subcat;
+        });
+    }
+    
+    renderTable(filteredRows);
+}
+
+// Populate dropdowns from hist_2025 image names
+const histImages = [
+    "hist_Board_of_Directors__Articles_ByLaws.png",
+    "hist_Board_of_Directors__Board_Classification.png",
+    "hist_Board_of_Directors__Board_Composition.png",
+    "hist_Board_of_Directors__Board_Size.png",
+    "hist_Board_of_Directors__Cumulative_Voting.png",
+    "hist_Board_of_Directors__Director_Remuneration.png",
+    "hist_Board_of_Directors__Elections,_Board_Size.png",
+    "hist_Board_of_Directors__Elections.png",
+    "hist_Board_of_Directors__Independent_Board_Chairman.png",
+    "hist_Board_of_Directors__Majority_Voting.png",
+    "hist_Board_of_Directors__Miscellaneous_Board_of_Directors.png",
+    "hist_Board_of_Directors__Proxy_Access.png",
+    "hist_Board_of_Directors__Remove_Directors_Board_Members.png",
+    "hist_Compensation__Articles_ByLaws.png",
+    "hist_Compensation__Bonus_Plan.png",
+    "hist_Compensation__Employee_Stock_Purchase_Program.png",
+    "hist_Compensation__Employment_Agreements.png",
+    "hist_Compensation__Executive_Pay_Evaluation_(Say_on_Pay).png",
+    "hist_Compensation__Golden_Parachutes.png",
+    "hist_Compensation__Miscellaneous_Compensation.png",
+    "hist_Compensation__Omnibus_Stock_Plan.png",
+    "hist_Compensation__Restricted_Stock_Plan.png",
+    "hist_Compensation__Severance_Agreements.png",
+    "hist_Compensation__Stock_Option_Plans.png",
+    "hist_Compensation__Stock_Plan.png",
+    "hist_Corporate_Actions__Acquisition_Agreement.png",
+    "hist_Corporate_Actions__Articles_ByLaws.png",
+    "hist_Corporate_Actions__Assets.png",
+    "hist_Corporate_Actions__Corporate_Actions.png",
+    "hist_Corporate_Actions__Dividend_Reinvestment_Plan.png",
+    "hist_Corporate_Actions__Investment_Agreement_Policy.png",
+    "hist_Corporate_Actions__Merger_Plan.png",
+    "hist_Corporate_Actions__Miscellaneous_Corporate_Actions.png",
+    "hist_Corporate_Actions__Reorganization_Plan.png",
+    "hist_Corporate_Actions__Scheme_Arrangement.png",
+    "hist_Corporate_Governance__Articles_ByLaws.png",
+    "hist_Corporate_Governance__Audit_Related.png",
+    "hist_Corporate_Governance__Corporate_Governance.png",
+    "hist_Corporate_Governance__Financial_Statements.png",
+    "hist_Corporate_Governance__Miscellaneous_Corporate_Governance.png",
+    "hist_Corporate_Structure__Investment_Advisory_Agreement.png",
+    "hist_Corporate_Structure__Liquidation_Plan.png",
+    "hist_Corporate_Structure__Miscellaneous_Corporate_Actions.png",
+    "hist_Corporate_Structure__Spin_Off.png",
+    "hist_Environmental_Social__Animal_Rights.png",
+    "hist_Environmental_Social__Environmental.png",
+    "hist_Environmental_Social__Health.png",
+    "hist_Environmental_Social__Miscellaneous_Environmental_Social.png",
+    "hist_Environmental_Social__Political_Government.png",
+    "hist_Environmental_Social__Social.png",
+    "hist_Environmental_Social__Tobacco.png",
+    "hist_Shareholder_Equity__Allot_Securities.png",
+    "hist_Shareholder_Equity__Articles_ByLaws.png",
+    "hist_Shareholder_Equity__Authorize_Stock_Decrease.png",
+    "hist_Shareholder_Equity__Authorize_Stock_Increase.png",
+    "hist_Shareholder_Equity__Capital_Accumulation_Plan.png",
+    "hist_Shareholder_Equity__Class_of_Stock_Elimination.png",
+    "hist_Shareholder_Equity__Miscellaneous_Shareholder_Equity.png",
+    "hist_Shareholder_Equity__New_Class_of_Stock.png",
+    "hist_Shareholder_Equity__Par_Value.png",
+    "hist_Shareholder_Equity__Repurchase_Program.png",
+    "hist_Shareholder_Equity__Share_Capital.png",
+    "hist_Shareholder_Equity__Stock_Issuance.png",
+    "hist_Shareholder_Equity__Stock_Splits_Reverse_Stock_Splits.png",
+    "hist_Shareholder_Equity__Stock_Terms_Revision.png",
+    "hist_Shareholder_Rights__Antitakeover_Provisions.png",
+    "hist_Shareholder_Rights__Articles_ByLaws.png",
+    "hist_Shareholder_Rights__Directors_Board_Removal.png",
+    "hist_Shareholder_Rights__Meeting_Management.png",
+    "hist_Shareholder_Rights__Supermajority_Voting.png",
+    "hist_Shareholder_Rights__Voting_Rights.png"
+];
+
+// Parse category/subcategory from filenames
+const catSubcatSet = new Set();
+const catToSubcats = {};
+histImages.forEach(fn => {
+    const m = fn.match(/^hist_(.*?)__(.*?)\.png$/);
+    if (m) {
+        let cat = m[1].replace(/_/g, ' ');
+        let subcat = m[2].replace(/_/g, ' ');
+        
+        // Handle special cases like parentheses in filenames
+        subcat = subcat.replace(/\(/g, '(').replace(/\)/g, ')');
+        
+        catSubcatSet.add(cat + '|||' + subcat);
+        if (!catToSubcats[cat]) catToSubcats[cat] = new Set();
+        catToSubcats[cat].add(subcat);
+    }
+});
+const catSelect = document.getElementById('catSelect');
+const subcatSelect = document.getElementById('subcatSelect');
+catSelect.innerHTML = '';
+Object.keys(catToSubcats).forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    catSelect.appendChild(opt);
+});
+function updateSubcatOptions() {
+    const cat = catSelect.value;
+    subcatSelect.innerHTML = '';
+    if (catToSubcats[cat]) {
+        Array.from(catToSubcats[cat]).forEach(subcat => {
+            const opt = document.createElement('option');
+            opt.value = subcat;
+            opt.textContent = subcat;
+            subcatSelect.appendChild(opt);
+        });
+        // Select the first subcategory by default
+        if (subcatSelect.options.length > 0) {
+            subcatSelect.selectedIndex = 0;
+        }
+    }
+    showSelectedHist(); // Always update chart when subcat changes
+    filterAndRenderTable(); // Filter table based on new selection
+}
+catSelect.addEventListener('change', updateSubcatOptions);
+subcatSelect.addEventListener('change', function() {
+    showSelectedHist();
+    filterAndRenderTable();
+});
+
+// Show All button functionality
+document.getElementById('showAllBtn').addEventListener('click', function() {
+    catSelect.selectedIndex = 0; // Reset to first option
+    updateSubcatOptions(); // This will update subcategory and trigger filtering
+    document.getElementById('histContainer').innerHTML = ''; // Clear histogram
+    renderTable(rawRows); // Show all rows without filter
+});
+
+updateSubcatOptions(); // Initial population and chart
+
+document.getElementById('showAllBtn').onclick = function() {
+    document.getElementById('catSelect').value = '';
+    document.getElementById('subcatSelect').value = '';
+    loadedRows = rawRows;
+    renderTable(loadedRows);
+    document.getElementById('histContainer').innerHTML = '';
+};
+
+function showSelectedHist() {
+    const cat = catSelect.value;
+    const subcat = subcatSelect.value;
+    if (!cat || !subcat) {
+        document.getElementById('histContainer').innerHTML = '';
+        return;
+    }
+    // Find the image filename (fix: match with underscores, handle special chars like parentheses)
+    function safeName(s) {
+        // Convert the display name back to the filename format
+        return String(s)
+            .replace(/\(/g, '_')
+            .replace(/\)/g, '_')
+            .replace(/\//g, '_')
+            .replace(/ /g, '_')
+            .replace(/,/g, ','); // Keep commas as they are in filenames
+    }
+    const fname = 'hist_' + safeName(cat) + '__' + safeName(subcat) + '.png';
+    console.log('Looking for:', fname); // Debug log
+    console.log('Available images:', histImages.filter(img => img.includes(cat.replace(/ /g, '_')))); // Debug log
+    
+    if (!histImages.includes(fname)) {
+        document.getElementById('histContainer').innerHTML = `<p>No histogram image found for: ${fname}</p>`;
+        return;
+    }
+    document.getElementById('histContainer').innerHTML = `<div style='display:flex;gap:32px;justify-content:center;align-items:flex-start;'>
+        <div style='text-align:center;'>
+            <img src='hist_2025/${fname}' style='max-width:600px;max-height:340px;border:1px solid #ccc;background:#fff;' onerror="this.style.display='none'; this.parentNode.innerHTML='<p>Image failed to load: ${fname}</p>'">
+        </div>
+    </div>`;
+}
+
+// Remove all the duplicate aggregation and CSV handling code that conflicts
+// Only keep the essential dropdown and image display functionality
+</script>
+</body>
+</html>
