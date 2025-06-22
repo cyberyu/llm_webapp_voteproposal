@@ -433,14 +433,6 @@
                 <div id="largeTableContainer">
                     <div class="no-data">No large CSV file loaded. Upload a file to view top 100 rows with synchronized filtering.</div>
                 </div>
-                
-                <!-- Show Summary Button and Summary Box -->
-                <div style="margin-top: 16px;">
-                    <button class="btn" id="showSummaryBtn" disabled>Show Summary</button>
-                </div>
-
-                <div id="summaryBox" style="margin: 16px 0; padding: 16px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px; color: #333; white-space: pre-line; display: none;">
-                </div>
             </div>
         </div>
 
@@ -689,7 +681,6 @@
                     document.getElementById('loadLargeBtn').disabled = false;
                     document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
                     document.getElementById('clearLargeBtn').disabled = false;
-                    updateShowSummaryButton();
                 },
                 error: function(error) {
                     showLargeError('Failed to read CSV file: ' + error.message);
@@ -713,8 +704,6 @@
             document.getElementById('largeCsvInput').value = '';
             document.getElementById('loadLargeBtn').disabled = true;
             document.getElementById('clearLargeBtn').disabled = true;
-            document.getElementById('summaryBox').style.display = 'none';
-            updateShowSummaryButton();
             
             // Regenerate comparison chart
             generateComparisonChart();
@@ -748,437 +737,6 @@
             document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">Upload and load a CSV file to see issuer distribution</div>';
             document.getElementById('comparisonChartContainer').innerHTML = '<div class="no-chart">Upload both datasets to see issuer proposal comparison</div>';
         });
-
-        // Show Summary button click handler
-        document.getElementById('showSummaryBtn').addEventListener('click', function() {
-            const summaryBox = document.getElementById('summaryBox');
-            const peerDropdown = document.getElementById('issuerDropdownPeer');
-            const selectedIssuer = peerDropdown ? peerDropdown.value : '';
-            
-            // Get record dates, services, mgmt recommendations, and approval rates for the selected issuer from both datasets
-            let allRecordDates = [];
-            let allServices = [];
-            let allMgmtRecs = [];
-            let peerApprovalRates = [];
-            let largeApprovedRates = [];
-
-            // --- Fix: Always filter large dataset by selectedIssuer for summary counts ---
-            // Check peer analysis dataset for record dates and approval rates
-            if (csvData.length > 0 && issuerCol) {
-                const recordDateCol = headers.find(h => 
-                    h.toLowerCase().includes('recorddate') || 
-                    h.toLowerCase().includes('record_date') || 
-                    h.toLowerCase().includes('record date') ||
-                    h.toLowerCase().includes('meetingdate') ||
-                    h.toLowerCase().includes('meeting_date')
-                );
-                const forRatioCol = headers.find(h => 
-                    h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
-                );
-                
-                const peerRows = csvData.filter(row => (row[issuerCol] || '') === selectedIssuer);
-                
-                if (recordDateCol) {
-                    const peerDates = peerRows.map(row => row[recordDateCol]).filter(Boolean);
-                    allRecordDates.push(...peerDates);
-                }
-                
-                if (forRatioCol) {
-                    const peerRates = peerRows.map(row => parseFloat(row[forRatioCol])).filter(rate => !isNaN(rate));
-                    peerApprovalRates.push(...peerRates);
-                }
-            }
-            
-            // Check large dataset for all data (record dates, services, mgmt recommendations, approved rates)
-            if (largeCsvData.length > 0 && largeIssuerCol) {
-                const recordDateCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('recorddate') || 
-                    h.toLowerCase().includes('record_date') || 
-                    h.toLowerCase().includes('record date') ||
-                    h.toLowerCase().includes('meetingdate') ||
-                    h.toLowerCase().includes('meeting_date')
-                );
-                const serviceCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('service') || 
-                    h.toLowerCase().includes('services')
-                );
-                const mgmtRecCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('mgmt_rec') || 
-                    h.toLowerCase().includes('mgmtrec') ||
-                    h.toLowerCase().includes('management_recommendation') ||
-                    h.toLowerCase().includes('mgmt rec')
-                );
-                const forRatioCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
-                );
-                // --- Only use rows for the selected issuer for all calculations below ---
-                const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
-
-                if (recordDateCol) {
-                    const largeDates = largeRows.map(row => row[recordDateCol]).filter(Boolean);
-                    allRecordDates.push(...largeDates);
-                }
-
-                // Only aggregate services and mgmt recommendations from large dataset (no double counting)
-                if (serviceCol) {
-                    const largeServices = largeRows.map(row => row[serviceCol]).filter(Boolean);
-                    allServices.push(...largeServices);
-                }
-
-                if (mgmtRecCol) {
-                    const largeMgmtRecs = largeRows.map(row => row[mgmtRecCol]).filter(Boolean);
-                    allMgmtRecs.push(...largeMgmtRecs);
-                }
-
-                if (forRatioCol) {
-                    // Only approved proposals (>= 0.5) for approval rates
-                    const largeRates = largeRows.map(row => parseFloat(row[forRatioCol]))
-                        .filter(rate => !isNaN(rate) && rate >= 0.5);
-                    largeApprovedRates.push(...largeRates);
-                }
-            }
-            
-            // Normalize dates to consistent format and remove duplicates
-            const normalizedDates = [...new Set(allRecordDates.map(date => {
-                // Helper to parse DD/MM/YYYY or DD-MM-YYYY as day first
-                function parseDayFirst(d) {
-                    if (typeof d !== 'string') return null;
-                    let m = d.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-                    if (m) {
-                        // DD/MM/YYYY or DD-MM-YYYY
-                        const day = parseInt(m[1], 10);
-                        const month = parseInt(m[2], 10);
-                        const year = parseInt(m[3], 10);
-                        // JS months are 0-based
-                        return new Date(year, month - 1, day);
-                    }
-                    // Try YYYY-MM-DD
-                    m = d.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-                    if (m) {
-                        return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
-                    }
-                    // Try Date constructor fallback
-                    const dt = new Date(d);
-                    if (!isNaN(dt.getTime())) return dt;
-                    return null;
-                }
-                const parsedDate = parseDayFirst(date);
-                if (parsedDate && !isNaN(parsedDate.getTime())) {
-                    // Exclude future dates after 2025-06-01
-                    const cutoff = new Date(2025, 5, 1); // June is month 5 (0-based)
-                    if (parsedDate > cutoff) return null;
-                    return parsedDate.toISOString().split('T')[0];
-                }
-                return null;
-            }).filter(Boolean))];
-            
-            // Sort dates from past to present
-            normalizedDates.sort((a, b) => {
-                const dateA = new Date(a);
-                const dateB = new Date(b);
-                return dateA - dateB;
-            });
-            
-            // Process services - count occurrences of each service type (from large dataset only)
-            const serviceCounts = {};
-            allServices.forEach(service => {
-                const cleanService = service.trim();
-                if (cleanService) {
-                    serviceCounts[cleanService] = (serviceCounts[cleanService] || 0) + 1;
-                }
-            });
-            
-            // Process MGMT_REC - count occurrences of each recommendation type (from large dataset only)
-            const mgmtRecCounts = {};
-            allMgmtRecs.forEach(mgmtRec => {
-                const cleanMgmtRec = mgmtRec.trim();
-                if (cleanMgmtRec) {
-                    mgmtRecCounts[cleanMgmtRec] = (mgmtRecCounts[cleanMgmtRec] || 0) + 1;
-                }
-            });
-            
-            // Create service summary string
-            let serviceSummary = '';
-            if (Object.keys(serviceCounts).length > 0) {
-                const serviceEntries = Object.entries(serviceCounts)
-                    .sort((a, b) => b[1] - a[1]) // Sort by count descending
-                    .map(([service, count]) => count > 1 ? `${service} (${count})` : service);
-                serviceSummary = serviceEntries.join(', ');
-            }
-            
-            // Create MGMT_REC summary string
-            let mgmtRecSummary = '';
-            if (Object.keys(mgmtRecCounts).length > 0) {
-                const mgmtRecEntries = Object.entries(mgmtRecCounts)
-                    .sort((a, b) => b[1] - a[1]) // Sort by count descending
-                    .map(([mgmtRec, count]) => count > 1 ? `${mgmtRec} (${count})` : mgmtRec);
-                mgmtRecSummary = mgmtRecEntries.join(', ');
-            }
-            
-            // Process peer approval rates
-            let approvalRateSummary = '';
-            if (peerApprovalRates.length > 0) {
-                const minRate = Math.min(...peerApprovalRates);
-                const maxRate = Math.max(...peerApprovalRates);
-                approvalRateSummary = `${(minRate * 100).toFixed(1)}%-${(maxRate * 100).toFixed(1)}%`;
-            }
-            
-            // Process large dataset approved rates
-            let approvedRateSummary = '';
-            if (largeApprovedRates.length > 0) {
-                const minApprovedRate = Math.min(...largeApprovedRates);
-                const maxApprovedRate = Math.max(...largeApprovedRates);
-                approvedRateSummary = `${(minApprovedRate * 100).toFixed(1)}%-${(maxApprovedRate * 100).toFixed(1)}%`;
-            }
-            
-            // Build summary text
-            let summaryText = selectedIssuer || 'No issuer selected';
-            
-            if (normalizedDates.length > 0) {
-                summaryText += '\n\nRecord Date(s): ' + normalizedDates.join(', ');
-            } else {
-                summaryText += '\n\nNo record dates found for this issuer.';
-            }
-            
-            if (serviceSummary) {
-                summaryText += '\n\nService(s): ' + serviceSummary;
-            } else {
-                summaryText += '\n\nNo services found for this issuer.';
-            }
-            
-            if (mgmtRecSummary) {
-                summaryText += '\n\nMgmt Recommendation(s): ' + mgmtRecSummary;
-            } else {
-                summaryText += '\n\nNo management recommendations found for this issuer.';
-            }
-            
-            if (approvalRateSummary && approvedRateSummary) {
-                summaryText += '\n\nFailed proposals shares approval rate: ' + approvalRateSummary + ', Approved proposals shares approval rate: ' + approvedRateSummary;
-            } else if (approvalRateSummary) {
-                summaryText += '\n\nFailed proposals shares approval rate: ' + approvalRateSummary;
-            } else if (approvedRateSummary) {
-                summaryText += '\n\nApproved proposals shares approval rate: ' + approvedRateSummary;
-            } else {
-                summaryText += '\n\nNo approval rates found for this issuer.';
-            }
-            
-            // Add reject and approved proposal counts from large dataset
-            let rejectedCount = 0;
-            let approvedCount = 0;
-
-            if (largeCsvData.length > 0 && largeIssuerCol && selectedIssuer) {
-                const forRatioCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
-                );
-                if (forRatioCol) {
-                    // --- Only count proposals for the selected issuer ---
-                    const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
-                    largeRows.forEach(row => {
-                        const forRatio = parseFloat(row[forRatioCol]);
-                        if (!isNaN(forRatio)) {
-                            if (forRatio < 0.5) {
-                                rejectedCount++;
-                            } else if (forRatio >= 0.5) {
-                                approvedCount++;
-                            }
-                        }
-                    });
-                }
-            }
-            
-            summaryText += `\n\nReject proposal count: ${rejectedCount}     Approved proposal count: ${approvedCount}`;
-            
-            // Add detailed breakdown of rejected proposals
-            if (rejectedCount > 0 && largeCsvData.length > 0 && largeIssuerCol && selectedIssuer) {
-                const forRatioCol = largeHeaders.find(h => 
-                    h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
-                );
-                
-                if (forRatioCol) {
-                    // Get rejected proposals from large dataset for category aggregation
-                    const rejectedProposalsLarge = largeCsvData.filter(row => {
-                        const issuerMatch = (row[largeIssuerCol] || '') === selectedIssuer;
-                        const forRatio = parseFloat(row[forRatioCol]);
-                        return issuerMatch && !isNaN(forRatio) && forRatio < 0.5;
-                    });
-                    
-                    if (rejectedProposalsLarge.length > 0) {
-                        summaryText += '\n\nRejected Proposals Breakdown:';
-                        
-                        // Category-subcategory aggregation from large dataset
-                        // Use CATEGORY_ANNOTATED and SUBCATEGORY_ANNOTATED from Peer Analysis dataset (headers)
-                        const categoryAnnotatedCol = headers.find(h => h.trim().toLowerCase() === 'category_annotated');
-                        const subcategoryAnnotatedCol = headers.find(h => h.trim().toLowerCase() === 'subcategory_annotated');
-                        const categoryAggregation = {};
-                        // Use peerProposals from Peer Analysis dataset for breakdown
-                        const peerProposals = csvData.filter(row => (row[issuerCol] || '') === selectedIssuer);
-                        peerProposals.forEach(row => {
-                            const category = categoryAnnotatedCol ? (row[categoryAnnotatedCol] || 'Unknown') : 'Unknown';
-                            const subcategory = subcategoryAnnotatedCol ? (row[subcategoryAnnotatedCol] || 'Unknown') : 'N/A';
-                            const key = subcategoryAnnotatedCol ? `${category} | ${subcategory}` : category;
-                            categoryAggregation[key] = (categoryAggregation[key] || 0) + 1;
-                        });
-                        
-                        // First bullet: category summary with counts
-                        const categoryEntries = Object.entries(categoryAggregation)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([key, count]) => `${key} (${count})`);
-                        summaryText += '\n• Category Summary: ' + categoryEntries.join(', ');
-                        
-                        // Only map to the "PROPOSAL" column (case-insensitive, exact match)
-                        const proposalCol = headers.find(h => h.trim().toLowerCase() === 'proposal');
-                        // If you need the proposal master key, use a separate variable:
-                        const proposalMasterKeyCol = headers.find(h => h.trim().toLowerCase() === 'proposal_master_key');
-                        
-                        // Get individual proposal texts from peer analysis dataset
-                        console.log('proposalCol resolved to:', proposalCol);
-                        console.log('headers:', headers);
-                        // Show a sample of the first 5 values for this column:
-                        if (proposalCol && csvData.length > 0) {
-                            console.log('Sample values for proposalCol:');
-                            for (let i = 0; i < Math.min(5, csvData.length); i++) {
-                                console.log(`Row ${i}:`, csvData[i][proposalCol]);
-                            }
-                        }
-                        
-                        if (proposalCol && csvData.length > 0 && issuerCol) {
-                            const peerProposals = csvData.filter(row => (row[issuerCol] || '') === selectedIssuer);
-                            peerProposals.forEach((row) => {
-                                // Always use the proposal text from the PROPOSAL column
-                                let proposalText = row[proposalCol];
-                                if (proposalText && typeof proposalText === 'string') {
-                                    proposalText = proposalText.trim();
-                                }
-                                if (proposalText && proposalText.length > 0) {
-                                    // Truncate very long proposals for readability
-                                    const truncatedText = proposalText.length > 200 ? 
-                                        proposalText.substring(0, 200) + '...' : proposalText;
-                                    summaryText += `\n• ${truncatedText}`;
-                                } else {
-                                    summaryText += `\n• No proposal text available`;
-                                }
-                            });
-                        } else {
-                            summaryText += '\n• Proposal text column not found in peer analysis dataset';
-                        }
-                    }
-                }
-            }
-            
-            // --- Approved Proposals Breakdown ---
-            // Find approved proposals in large dataset (ForRatioAmongVoted_true >= 0.5)
-            const forRatioColLarge = largeHeaders.find(h => h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true'));
-            const categoryColLarge = largeHeaders.find(h => h.trim().toLowerCase() === 'category');
-            const subcategoryColLarge = largeHeaders.find(h => h.trim().toLowerCase() === 'subcategory');
-            const proposalColLarge = largeHeaders.find(h => h.trim().toLowerCase() === 'proposal');
-
-            if (forRatioColLarge && categoryColLarge && selectedIssuer) {
-                const approvedProposalsLarge = largeCsvData.filter(row => {
-                    const issuerMatch = (row[largeIssuerCol] || '') === selectedIssuer;
-                    const forRatio = parseFloat(row[forRatioColLarge]);
-                    return issuerMatch && !isNaN(forRatio) && forRatio >= 0.5;
-                });
-
-                if (approvedProposalsLarge.length > 0) {
-                    summaryText += '\n\nApproved Proposals Breakdown:';
-
-                    // 1st bullet: aggregated counts of category|subcategory
-                    const approvedCategoryAgg = {};
-                    approvedProposalsLarge.forEach(row => {
-                        const category = row[categoryColLarge] || 'Unknown';
-                        const subcategory = subcategoryColLarge ? (row[subcategoryColLarge] || 'Unknown') : 'N/A';
-                        const key = subcategoryColLarge ? `${category} | ${subcategory}` : category;
-                        approvedCategoryAgg[key] = (approvedCategoryAgg[key] || 0) + 1;
-                    });
-                    const approvedCategoryEntries = Object.entries(approvedCategoryAgg)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([key, count]) => `${key} (${count})`);
-                    summaryText += '\n• Category Summary: ' + approvedCategoryEntries.join(', ');
-
-                    // 2nd and subsequent bullets: enumerate proposal text
-                    approvedProposalsLarge.forEach(row => {
-                        let proposalText = proposalColLarge ? row[proposalColLarge] : '';
-                        if (proposalText && typeof proposalText === 'string') {
-                            proposalText = proposalText.trim();
-                        }
-                        if (proposalText && proposalText.length > 0) {
-                            const truncatedText = proposalText.length > 200 ?
-                                proposalText.substring(0, 200) + '...' : proposalText;
-                            summaryText += `\n• ${truncatedText}`;
-                        } else {
-                            summaryText += `\n• No proposal text available`;
-                        }
-                    });
-                }
-            }
-            
-            // --- formatting for HTML output with bullets and line breaks ---
-            // Convert summaryText to HTML: bullets as <ul><li>, line breaks as <br>
-            function summaryTextToHtml(text) {
-                // Split into sections by double line breaks
-                const sections = text.split(/\n\n/);
-                let html = '';
-                for (let section of sections) {
-                    // If section contains bullets
-                    if (section.includes('\n•')) {
-                        // Split into title and bullets
-                        const [title, ...bullets] = section.split('\n•');
-                        html += `<div>${escapeHtml(title.trim())}</div>`;
-                        html += '<ul style="margin-top:4px; margin-bottom:10px; padding-left:22px;">';
-                        for (let bullet of bullets) {
-                            html += `<li style="margin-bottom:2px;">${escapeHtml(bullet.trim())}</li>`;
-                        }
-                        html += '</ul>';
-                    } else {
-                        // Just normal section, replace single \n with <br>
-                        html += `<div style="margin-bottom:8px;">${escapeHtml(section.trim()).replace(/\n/g, '<br>')}</div>`;
-                    }
-                }
-                return html;
-            }
-
-            summaryBox.innerHTML = summaryTextToHtml(summaryText);
-            summaryBox.style.display = 'block';
-        });
-
-        // Enable/disable Show Summary button based on data availability and issuer selection
-        function updateShowSummaryButton() {
-            const btn = document.getElementById('showSummaryBtn');
-            const peerDropdown = document.getElementById('issuerDropdownPeer');
-            const largeDropdown = document.getElementById('issuerDropdownLarge');
-            
-            // Check if both datasets are loaded
-            if (largeCsvData.length === 0 || csvData.length === 0) {
-                btn.disabled = true;
-                document.getElementById('summaryBox').style.display = 'none';
-                return;
-            }
-            
-            // Check if both dropdowns have the same issuer selected (and not empty)
-            const peerValue = peerDropdown ? peerDropdown.value : '';
-            const largeValue = largeDropdown ? largeDropdown.value : '';
-            
-            if (peerValue && largeValue && peerValue === largeValue && peerValue !== 'NONE') {
-                btn.disabled = false;
-            } else {
-                btn.disabled = true;
-                document.getElementById('summaryBox').style.display = 'none';
-            }
-        }
-
-        // Wrap handleIssuerSelection to update summary button
-        const original_handleIssuerSelection = handleIssuerSelection;
-        handleIssuerSelection = function(selectedIssuer) {
-            original_handleIssuerSelection.apply(this, arguments);
-            updateShowSummaryButton();
-        };
-
-        // Wrap showAllRows to update summary button
-        const original_showAllRows2 = showAllRows;
-        showAllRows = function() {
-            original_showAllRows2.apply(this, arguments);
-            updateShowSummaryButton();
-        };
 
         function generateCategoryChart() {
             // Use CATEGORY_ANNOTATED and SUBCATEGORY_ANNOTATED if present, else fallback
@@ -2002,7 +1560,7 @@
             }
             
             const chartTitles = document.querySelectorAll('.chart-title');
-                       chartTitles[0].textContent = 'Category Distribution';
+            chartTitles[0].textContent = 'Category Distribution';
             if (chartTitles[1]) {
                 chartTitles[1].textContent = 'Issuer Distribution';
             }
@@ -2157,14 +1715,14 @@
             }
 
             // Show only top 100 rows
-            const displayData = largeFilteredData.slice(0,  100);
+            const displayData = largeFilteredData.slice(0, 100);
             
             let html = '<table><thead><tr>';
             
             // Create header row with special classes
             largeHeaders.forEach(header => {
                 const lowerHeader = header.toLowerCase();
-                               let headerClass = '';
+                let headerClass = '';
                 
                 if (lowerHeader.includes('proposal')) {
                     headerClass = 'proposal-header';
@@ -2310,7 +1868,7 @@
                                     console.error('Error in load function:', error);
                                     reject(error);
                                 }
-                                                       },
+                            },
                             error: function(error) {
                                 console.error('Papa Parse error:', error);
                                 if (isLargeDataset) {
@@ -2337,7 +1895,6 @@
         function loadDatasetFromData(parsedData, filename) {
             if (parsedData.length === 0) {
                 showError('Default file is empty or invalid');
-               
                 return;
             }
             
@@ -2408,7 +1965,6 @@
             
             // Update button states
             document.getElementById('clearLargeBtn').disabled = false;
-            updateShowSummaryButton();
         }
 
         // --- NON-INVASIVE ISSUER DROPDOWN INTEGRATION FOR BOTH DATASETS ---
@@ -2594,11 +2150,8 @@
                 }
                 if (largeDropdown && getLargeIssuers().includes(selectedIssuer)) largeDropdown.value = selectedIssuer;
             }
-            // --- Enable Show Summary button if only one issuer is shown in chart ---
-            if (chartType === 'issuer' && elements.length === 1 && labels.length === 1) {
-                updateShowSummaryButton();
-            }
         };
+
         // --- END OF NON-INVASIVE INTEGRATION ---
     </script>
 </body>

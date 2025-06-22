@@ -761,8 +761,7 @@
             let allMgmtRecs = [];
             let peerApprovalRates = [];
             let largeApprovedRates = [];
-
-            // --- Fix: Always filter large dataset by selectedIssuer for summary counts ---
+            
             // Check peer analysis dataset for record dates and approval rates
             if (csvData.length > 0 && issuerCol) {
                 const recordDateCol = headers.find(h => 
@@ -811,29 +810,28 @@
                 const forRatioCol = largeHeaders.find(h => 
                     h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
                 );
-                // --- Only use rows for the selected issuer for all calculations below ---
+                
                 const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
-
+                
                 if (recordDateCol) {
                     const largeDates = largeRows.map(row => row[recordDateCol]).filter(Boolean);
                     allRecordDates.push(...largeDates);
                 }
-
+                
                 // Only aggregate services and mgmt recommendations from large dataset (no double counting)
                 if (serviceCol) {
                     const largeServices = largeRows.map(row => row[serviceCol]).filter(Boolean);
                     allServices.push(...largeServices);
                 }
-
+                
                 if (mgmtRecCol) {
                     const largeMgmtRecs = largeRows.map(row => row[mgmtRecCol]).filter(Boolean);
                     allMgmtRecs.push(...largeMgmtRecs);
                 }
-
+                
                 if (forRatioCol) {
-                    // Only approved proposals (>= 0.5) for approval rates
                     const largeRates = largeRows.map(row => parseFloat(row[forRatioCol]))
-                        .filter(rate => !isNaN(rate) && rate >= 0.5);
+                        .filter(rate => !isNaN(rate) && rate >= 0.5); // Only approved proposals (>= 0.5)
                     largeApprovedRates.push(...largeRates);
                 }
             }
@@ -965,20 +963,21 @@
             // Add reject and approved proposal counts from large dataset
             let rejectedCount = 0;
             let approvedCount = 0;
-
+            
             if (largeCsvData.length > 0 && largeIssuerCol && selectedIssuer) {
                 const forRatioCol = largeHeaders.find(h => 
                     h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
                 );
+                
                 if (forRatioCol) {
-                    // --- Only count proposals for the selected issuer ---
                     const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
+                    
                     largeRows.forEach(row => {
                         const forRatio = parseFloat(row[forRatioCol]);
                         if (!isNaN(forRatio)) {
                             if (forRatio < 0.5) {
                                 rejectedCount++;
-                            } else if (forRatio >= 0.5) {
+                            } else {
                                 approvedCount++;
                             }
                         }
@@ -2594,11 +2593,8 @@
                 }
                 if (largeDropdown && getLargeIssuers().includes(selectedIssuer)) largeDropdown.value = selectedIssuer;
             }
-            // --- Enable Show Summary button if only one issuer is shown in chart ---
-            if (chartType === 'issuer' && elements.length === 1 && labels.length === 1) {
-                updateShowSummaryButton();
-            }
         };
+
         // --- END OF NON-INVASIVE INTEGRATION ---
     </script>
 </body>

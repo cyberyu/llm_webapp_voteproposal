@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LLM WebApp Table Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding-top: 60px; }
+        /* Navigation Bar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding: 0 20px;
+        }
+        .nav-brand {
+            color: #ecf0f1;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-links a {
+            color: #bdc3c7;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .nav-links a:hover {
+            background: #34495e;
+            color: #ecf0f1;
+        }
+        .nav-links a.active {
+            background: #3498db;
+            color: white;
+            cursor: default;
+        }
+        /* Existing styles */
+        .main-content {
+            margin: 2em;
+        }
+        table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+        th, td { border: 1px solid #ccc; padding: 0.5em; }
+        th { background: #f0f0f0; }
+        .btn { margin-top: 1em; padding: 0.5em 1em; background: #0074d9; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .btn:disabled { background: #aaa; }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">LLM WebApp</a>
+            <ul class="nav-links">
+                <li><a href="webui.html" class="active">Main Table</a></li>
+                <li><a href="detail.html">Detail Viewer</a></li>
+                <li><a href="histrogram.html">Histogram Analyzer</a></li>
+                <li><a href="peeranalysis.html">Peer Analysis</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <h1>LLM WebApp Table Demo</h1>
+        <div style="display: flex; gap: 1em; margin-bottom: 1em;">
+            <button class="btn" id="queryNanoBtn" disabled>QueryNano (gpt-4.1-nano)</button>
+            <button class="btn" id="queryMiniBtn" disabled>QueryMini (gpt-4.1-mini)</button>
+            <div id="progressBarContainer" style="flex:1; display:none; align-items:center;">
+                <div style="width:100%; background:#eee; border-radius:4px; height:18px; position:relative;">
+                    <div id="progressBar" style="background:#0074d9; height:100%; width:0%; border-radius:4px;"></div>
+                    <span id="progressText" style="position:absolute; left:50%; top:0; transform:translateX(-50%); font-size:0.9em; color:#222;"></span>
+                </div>
+            </div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" />
+        <button class="btn" id="uploadBtn">Upload CSV</button>
+        <button class="btn" id="saveBtn" disabled>Save Results as CSV</button>
+        <div id="tableContainer"></div>
+        <script>
+            const backend = 'http://localhost:8000';
+            let tableRows = [];
+            let currentSort = { key: null, asc: true };
+            // Category and subcategory options from instruct.csv (updated)
+            const categoryOptions = [
+                'Board of Directors',
+                'Compensation',
+                'Corporate Actions',
+                'Corporate Governance',
+                'Corporate Structure',
+                'Shareholder Equity',
+                'Shareholder Rights'
+            ];
+            const subcategoryOptions = [
+                [
+                    'Articles/ByLaws', 'Board Classification', 'Board Composition', 'Board Size', 'Cumulative Voting', 'Director Remuneration', 'Elections', 'Board Size', 'Indemnification/Liability', 'Independent Board Chairman', 'Majority Voting', 'Miscellaneous Board of Directors', 'Proxy Access', 'Quorum Requirements', 'Remove Directors/Board Members'
+                ],
+                [
+                    'Articles/ByLaws', 'Bonus Plan', 'Cash/Stock Bonus Plan', 'Directors Fees', 'Employee Stock Purchase Program', 'Employment Agreements', 'Executive Pay Evaluation (Say on Pay)', 'Golden Parachutes', 'Miscellaneous Compensation', 'Omnibus Stock Plan', 'Restricted Stock Plan', 'Stock Option Plans'
+                ],
+                [
+                    'Acquisition Agreement', 'Articles/ByLaws', 'Assets', 'Corporate Actions', 'Dividend Reinvestment Plan', 'Investment Advisory Agreement', 'Investment Agreement/Policy', 'Merger Plan', 'Miscellaneous Corporate Actions', 'Reorganization Plan', 'Scheme Arrangement'
+                ],
+                [
+                    'Audit Related', 'Company Name Change', 'Corporate Governance', 'Financial Statements', 'Meeting Management', 'Miscellaneous Corporate Governance'
+                ],
+                [
+                    'Investment Advisory Agreement', 'Liquidation Plan', 'Miscellaneous Corporate Actions', 'Spin Off'
+                ],
+                [
+                    'Allot Securities', 'Articles/ByLaws', 'Authorize Stock Decrease', 'Authorize Stock Increase', 'Capital Accumulation Plan', 'Class of Stock Elimination', 'Dividend Reinvestment Plan', 'Miscellaneous Shareholder Equity', 'New Class of Stock', 'Par Value', 'Repurchase Program', 'Share Capital', 'Shareholder Equity', 'Stock Conversion', 'Stock Issuance', 'Stock Splits/Reverse Stock Splits', 'Stock Terms Revision', 'Voting Rights', 'Warrants/Bonds/Notes'
+                ],
+                [
+                    'Antitakeover Provisions', 'Articles/ByLaws', 'Control Share Acquisition', 'Directors/Board Removal', 'Meeting Management', 'Miscellaneous Shareholder Rights', 'Supermajority Voting', 'Voting Rights'
+                ]
+            ];
+
+            document.getElementById('uploadBtn').onclick = async function() {
+                const fileInput = document.getElementById('fileInput');
+                if (!fileInput.files.length) return alert('Please select a CSV file.');
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                const res = await fetch(backend + '/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    await loadTable();
+                    document.getElementById('queryNanoBtn').disabled = false;
+                }
+            };
+            async function loadTable() {
+                const res = await fetch(backend + '/data');
+                tableRows = await res.json();
+                renderTable();
+                document.getElementById('saveBtn').disabled = !tableRows.length;
+                document.getElementById('queryNanoBtn').disabled = !tableRows.length;
+                document.getElementById('queryMiniBtn').disabled = !tableRows.length;
+            }
+            function renderTable() {
+                const container = document.getElementById('tableContainer');
+                if (!tableRows.length) { container.innerHTML = '<p>No data loaded.</p>'; return; }
+                const keys = Object.keys(tableRows[0]);
+                let html = '<table><thead><tr>';
+                for (const key of keys) {
+                    html += `<th style="cursor:pointer;" onclick="sortTableBy('${key}')">${key} &#x25B2;&#x25BC;</th>`;
+                }
+                html += '</tr></thead><tbody>';
+                for (let rowIdx = 0; rowIdx < tableRows.length; rowIdx++) {
+                    const row = tableRows[rowIdx];
+                    html += '<tr>';
+                    for (const key of keys) {
+                        if (key === 'Category_Annotated') {
+                            // Render category dropdown
+                            html += `<td><select data-row="${rowIdx}" data-type="category" onchange="onCategoryChange(event)">`;
+                            html += '<option value=""></option>';
+                            for (let i = 0; i < categoryOptions.length; i++) {
+                                const cat = categoryOptions[i];
+                                const selected = row[key] && row[key].trim() === cat ? 'selected' : '';
+                                html += `<option value="${cat}" ${selected}>${cat}</option>`;
+                            }
+                            html += '</select></td>';
+                        } else if (key === 'SubCategory_Annotated') {
+                            // Render subcategory dropdown, depends on selected category
+                            let selectedCat = row['Category_Annotated'] || '';
+                            let catIdx = categoryOptions.indexOf(selectedCat);
+                            let subcats = catIdx >= 0 ? subcategoryOptions[catIdx] : [];
+                            html += `<td><select data-row="${rowIdx}" data-type="subcategory" onchange="onSubcategoryChange(event)">`;
+                            html += '<option value=""></option>';
+                            for (let sub of subcats) {
+                                const selected = row[key] && row[key].trim() === sub ? 'selected' : '';
+                                html += `<option value="${sub}" ${selected}>${sub}</option>`;
+                            }
+                            html += '</select></td>';
+                        } else if (key === 'Mini_Category' || key === 'Mini_Subcategory') {
+                            html += `<td>${row[key] || ''}</td>`;
+                        } else {
+                            html += `<td>${row[key] || ''}</td>`;
+                        }
+                    }
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+            // Sorting logic remains unchanged
+            window.sortTableBy = function(key) {
+                if (currentSort.key === key) {
+                    currentSort.asc = !currentSort.asc;
+                } else {
+                    currentSort.key = key;
+                    currentSort.asc = true;
+                }
+                tableRows.sort((a, b) => {
+                    let va = a[key] || '';
+                    let vb = b[key] || '';
+                    // Try numeric sort if both are numbers
+                    if (!isNaN(parseFloat(va)) && !isNaN(parseFloat(vb))) {
+                        va = parseFloat(va); vb = parseFloat(vb);
+                    }
+                    if (va < vb) return currentSort.asc ? -1 : 1;
+                    if (va > vb) return currentSort.asc ? 1 : -1;
+                    return 0;
+                });
+                renderTable();
+            };
+            async function queryWithProgress(endpoint, btn) {
+                btn.disabled = true;
+                btn.textContent = 'Querying...';
+                document.getElementById('progressBarContainer').style.display = 'flex';
+                setProgress(0, 'Starting...');
+                // Start the query and get job_id
+                const resp = await fetch(backend + endpoint, { method: 'POST' });
+                const result = await resp.json();
+                const job_id = result.job_id;
+                // Poll progress
+                let done = false;
+                while (!done) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    const progResp = await fetch(backend + `/progress/${job_id}`);
+                    const prog = await progResp.json();
+                    setProgress(prog.progress, prog.progress + '%');
+                    done = prog.done;
+                }
+                setProgress(100, 'Done');
+                await loadTable();
+                setTimeout(() => {
+                    document.getElementById('progressBarContainer').style.display = 'none';
+                    setProgress(0, '');
+                }, 1200);
+                btn.disabled = false;
+                btn.textContent = btn.id === 'queryNanoBtn' ? 'QueryNano (gpt-4.1-nano)' : 'QueryMini (gpt-4.1-mini)';
+            }
+            function setProgress(percent, text) {
+                document.getElementById('progressBar').style.width = percent + '%';
+                document.getElementById('progressText').textContent = text;
+            }
+            document.getElementById('queryNanoBtn').onclick = async function() {
+                await queryWithProgress('/query', this);
+            };
+            document.getElementById('queryMiniBtn').onclick = async function() {
+                await queryWithProgress('/query_mini', this);
+            };
+            document.getElementById('saveBtn').onclick = function() {
+                if (!tableRows.length) return;
+                const keys = Object.keys(tableRows[0]);
+                const csv = [keys.join(',')].concat(tableRows.map(row => keys.map(k => '"' + String(row[k]||'').replace(/"/g,'""') + '"').join(','))).join('\n');
+                // Prompt user for filename
+                let filename = prompt('Enter filename for CSV (without extension):', 'llm_results');
+                if (!filename) return;
+                filename = filename.trim();
+                if (!filename.endsWith('.csv')) filename += '.csv';
+                // Prompt user for save location (directory) - browser cannot set directory, but can suggest
+                const a = document.createElement('a');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+            // Dropdown event handlers
+            window.onCategoryChange = function(event) {
+                const rowIdx = parseInt(event.target.getAttribute('data-row'));
+                const newCat = event.target.value;
+                tableRows[rowIdx]['Category_Annotated'] = newCat;
+                // Reset subcategory if category changes
+                tableRows[rowIdx]['SubCategory_Annotated'] = '';
+                renderTable();
+            };
+            window.onSubcategoryChange = function(event) {
+                const rowIdx = parseInt(event.target.getAttribute('data-row'));
+                const newSub = event.target.value;
+                tableRows[rowIdx]['SubCategory_Annotated'] = newSub;
+            };
+        </script>
+    </div>
+</body>
+</html>
