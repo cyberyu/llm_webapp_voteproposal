@@ -68,6 +68,34 @@
         }
         .histogram-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; text-align: center; }
         .histogram-panel { width: 48%; min-width: 320px; }
+        button { 
+            padding: 8px 16px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            background: #f0f0f0; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+        }
+        button:hover:not(:disabled) { 
+            background: #e0e0e0; 
+        }
+        button:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed; 
+            background: #f8f8f8; 
+        }
+        #loadBtn { 
+            background: #3498db; 
+            color: white; 
+            border-color: #2980b9; 
+        }
+        #loadBtn:hover:not(:disabled) { 
+            background: #2980b9; 
+        }
+        #loadBtn:disabled { 
+            background: #bdc3c7; 
+            border-color: #95a5a6; 
+        }
     </style>
 </head>
 <body>
@@ -94,7 +122,7 @@
         <button id="showAllBtn">Show All</button>
     </div>
     <input type="file" id="csvInput" accept=".csv">
-    <button id="loadBtn">Load & Show Table</button>
+    <button id="loadBtn" disabled>Load & Show Table</button>
     <div id="tableScroll"><div id="tableContainer"><p class="no-data">No CSV loaded. Please upload a file.</p></div></div>
     <div id="histContainer"></div>
 </div>
@@ -104,72 +132,142 @@ let fileContent = null;
 
 document.getElementById('csvInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
-    if (!file) return;
+    const loadBtn = document.getElementById('loadBtn');
+    
+    if (!file) {
+        loadBtn.disabled = true;
+        loadBtn.style.opacity = '0.6';
+        loadBtn.style.cursor = 'not-allowed';
+        fileContent = null;
+        console.log('No file selected');
+        return;
+    }
+    
+    console.log('File selected:', file.name);
     const reader = new FileReader();
     reader.onload = function(evt) {
         fileContent = evt.target.result;
-        document.getElementById('loadBtn').disabled = false;
+        loadBtn.disabled = false;
+        loadBtn.style.opacity = '1';
+        loadBtn.style.cursor = 'pointer';
         document.getElementById('tableContainer').innerHTML = '<p class="no-data">Click "Load & Show Table" to display the data.</p>';
         document.getElementById('histContainer').innerHTML = '';
+        console.log('File content loaded, ready to parse');
+    };
+    reader.onerror = function(error) {
+        console.error('File reading error:', error);
+        fileContent = null;
+        loadBtn.disabled = true;
+        document.getElementById('tableContainer').innerHTML = '<p class="no-data">Error reading file. Please try again.</p>';
     };
     reader.readAsText(file);
 });
 
-document.getElementById('loadBtn').onclick = function() {
-    if (!fileContent) return;
+document.getElementById('loadBtn').addEventListener('click', function() {
+    if (!fileContent) {
+        console.log('No file content available');
+        return;
+    }
+    
+    console.log('Starting to parse CSV...');
     Papa.parse(fileContent, {
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
+            console.log('CSV parsed successfully:', results);
             rawRows = results.data;
             headers = results.meta.fields;
             loadedRows = rawRows;
+            
+            // Render the table with all data initially
             renderTable(loadedRows);
+            
+            // After loading data, check if we need to apply current filter
+            if (catSelect.value && subcatSelect.value) {
+                filterAndRenderTable();
+            }
+        },
+        error: function(error) {
+            console.error('CSV parsing error:', error);
+            document.getElementById('tableContainer').innerHTML = '<p class="no-data">Error parsing CSV file. Please check the file format.</p>';
         }
     });
-};
+});
 
 function renderTable(rows) {
     const container = document.getElementById('tableContainer');
-    if (!rows.length) {
-        container.innerHTML = '<p class="no-data">No CSV loaded. Please upload a file.</p>';
+    if (!rows || !rows.length) {
+        container.innerHTML = '<p class="no-data">No data to display.</p>';
         return;
     }
+    
+    // Get the keys from the first row
     const keys = Object.keys(rows[0]);
+    if (!keys.length) {
+        container.innerHTML = '<p class="no-data">No columns found in data.</p>';
+        return;
+    }
+    
     let html = '<table><thead><tr>';
-    for (const key of keys) html += `<th>${key}</th>`;
+    for (const key of keys) {
+        html += `<th>${key || 'Unknown'}</th>`;
+    }
     html += '</tr></thead><tbody>';
+    
     const maxRows = 100;
     for (let i = 0; i < Math.min(rows.length, maxRows); i++) {
         html += '<tr>';
-        for (const key of keys) html += `<td>${rows[i][key]}</td>`;
+        for (const key of keys) {
+            const value = rows[i][key];
+            html += `<td>${value !== undefined && value !== null ? value : ''}</td>`;
+        }
         html += '</tr>';
     }
     html += '</tbody></table>';
+    
     if (rows.length > maxRows) {
         html += `<div style='color:#888; font-size:13px; margin-top:6px;'>Showing first ${maxRows} of ${rows.length} rows. Table truncated for performance.</div>`;
     }
+    
     container.innerHTML = html;
 }
 
 function filterAndRenderTable() {
-    if (!rawRows.length) return;
+    if (!rawRows.length) {
+        document.getElementById('tableContainer').innerHTML = '<p class="no-data">No CSV loaded. Please upload a file.</p>';
+        return;
+    }
     
-    const cat = catSelect.value;
-    const subcat = subcatSelect.value;
+    // Make sure global references are set
+    if (!catSelect) catSelect = document.getElementById('catSelect');
+    if (!subcatSelect) subcatSelect = document.getElementById('subcatSelect');
+    
+    const cat = catSelect ? catSelect.value : '';
+    const subcat = subcatSelect ? subcatSelect.value : '';
+    
+    // If no category/subcategory selected, show all data
+    if (!cat || !subcat) {
+        renderTable(rawRows);
+        return;
+    }
     
     // Filter rows based on selected category and subcategory
     let filteredRows = rawRows;
-    if (cat && subcat) {
-        // Find the column names for category and subcategory (case-insensitive)
-        const catCol = headers.find(h => h.toLowerCase().includes('category')) || 'category';
-        const subcatCol = headers.find(h => h.toLowerCase().includes('subcategory')) || 'subcategory';
-        
+    
+    // Find the column names for category and subcategory (case-insensitive)
+    const catCol = headers.find(h => h && h.toLowerCase().includes('category')) || 'category';
+    const subcatCol = headers.find(h => h && h.toLowerCase().includes('subcategory')) || 'subcategory';
+    
+    // Check if the columns actually exist in the data
+    if (rawRows.length > 0 && (rawRows[0][catCol] !== undefined || rawRows[0][subcatCol] !== undefined)) {
         filteredRows = rawRows.filter(row => {
-            const rowCat = row[catCol] || '';
-            const rowSubcat = row[subcatCol] || '';
+            const rowCat = (row[catCol] || '').toString().trim();
+            const rowSubcat = (row[subcatCol] || '').toString().trim();
             return rowCat === cat && rowSubcat === subcat;
         });
+    } else {
+        // If columns don't exist in the loaded data, just show all data
+        filteredRows = rawRows;
     }
     
     renderTable(filteredRows);
@@ -253,6 +351,10 @@ const histImages = [
 // Parse category/subcategory from filenames
 const catSubcatSet = new Set();
 const catToSubcats = {};
+
+// Global dropdown references
+let catSelect, subcatSelect;
+
 histImages.forEach(fn => {
     const m = fn.match(/^hist_(.*?)__(.*?)\.png$/);
     if (m) {
@@ -267,15 +369,43 @@ histImages.forEach(fn => {
         catToSubcats[cat].add(subcat);
     }
 });
-const catSelect = document.getElementById('catSelect');
-const subcatSelect = document.getElementById('subcatSelect');
-catSelect.innerHTML = '';
-Object.keys(catToSubcats).forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    catSelect.appendChild(opt);
-});
+// Initialize dropdowns and chart functionality
+function initializeDropdowns() {
+    // Set global references
+    catSelect = document.getElementById('catSelect');
+    subcatSelect = document.getElementById('subcatSelect');
+    
+    // Clear existing options
+    catSelect.innerHTML = '';
+    subcatSelect.innerHTML = '';
+    
+    // Populate category dropdown
+    Object.keys(catToSubcats).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        catSelect.appendChild(opt);
+    });
+    
+    // Setup event listeners (remove any existing ones first)
+    catSelect.removeEventListener('change', updateSubcatOptions);
+    subcatSelect.removeEventListener('change', subcatChangeHandler);
+    
+    catSelect.addEventListener('change', updateSubcatOptions);
+    subcatSelect.addEventListener('change', subcatChangeHandler);
+    
+    // Initialize with first category
+    if (catSelect.options.length > 0) {
+        catSelect.selectedIndex = 0;
+        updateSubcatOptions();
+    }
+}
+
+function subcatChangeHandler() {
+    showSelectedHist();
+    filterAndRenderTable();
+}
+
 function updateSubcatOptions() {
     const cat = catSelect.value;
     subcatSelect.innerHTML = '';
@@ -294,33 +424,59 @@ function updateSubcatOptions() {
     showSelectedHist(); // Always update chart when subcat changes
     filterAndRenderTable(); // Filter table based on new selection
 }
-catSelect.addEventListener('change', updateSubcatOptions);
-subcatSelect.addEventListener('change', function() {
-    showSelectedHist();
-    filterAndRenderTable();
-});
 
 // Show All button functionality
 document.getElementById('showAllBtn').addEventListener('click', function() {
-    catSelect.selectedIndex = 0; // Reset to first option
-    updateSubcatOptions(); // This will update subcategory and trigger filtering
-    document.getElementById('histContainer').innerHTML = ''; // Clear histogram
-    renderTable(rawRows); // Show all rows without filter
+    // Make sure global references are set
+    if (!catSelect) catSelect = document.getElementById('catSelect');
+    if (!subcatSelect) subcatSelect = document.getElementById('subcatSelect');
+    
+    // Reset dropdowns to first option
+    if (catSelect.options.length > 0) {
+        catSelect.selectedIndex = 0;
+        updateSubcatOptions();
+    }
+    
+    // Show all data without filter if data is loaded
+    if (rawRows.length > 0) {
+        renderTable(rawRows);
+    }
+    
+    // Clear histogram
+    document.getElementById('histContainer').innerHTML = '';
 });
 
-updateSubcatOptions(); // Initial population and chart
-
-document.getElementById('showAllBtn').onclick = function() {
-    document.getElementById('catSelect').value = '';
-    document.getElementById('subcatSelect').value = '';
-    loadedRows = rawRows;
-    renderTable(loadedRows);
+// Initialize the page state
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM content loaded, initializing page...');
+    
+    // Ensure load button is initially disabled
+    const loadBtn = document.getElementById('loadBtn');
+    loadBtn.disabled = true;
+    loadBtn.style.opacity = '0.6';
+    loadBtn.style.cursor = 'not-allowed';
+    
+    // Initialize table container
+    document.getElementById('tableContainer').innerHTML = '<p class="no-data">No CSV loaded. Please upload a file.</p>';
+    
+    // Initialize histogram container
     document.getElementById('histContainer').innerHTML = '';
-};
+    
+    // Initialize dropdowns and chart functionality
+    console.log('Initializing dropdowns...');
+    initializeDropdowns();
+    
+    console.log('Page initialization complete');
+});
 
 function showSelectedHist() {
-    const cat = catSelect.value;
-    const subcat = subcatSelect.value;
+    // Make sure global references are set
+    if (!catSelect) catSelect = document.getElementById('catSelect');
+    if (!subcatSelect) subcatSelect = document.getElementById('subcatSelect');
+    
+    const cat = catSelect ? catSelect.value : '';
+    const subcat = subcatSelect ? subcatSelect.value : '';
+    
     if (!cat || !subcat) {
         document.getElementById('histContainer').innerHTML = '';
         return;
