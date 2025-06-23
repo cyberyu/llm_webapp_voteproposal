@@ -1,5 +1,5 @@
 /**
- * PeerAnalysisStorage - Utility for saving/loading peer analysis data
+ * PeerAnalysisStorage - Utility for saving/loading error analysis data
  */
 const PeerAnalysisStorage = {
     keys: {

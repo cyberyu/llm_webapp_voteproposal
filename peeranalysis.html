@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Peer Analysis</title>
+    <title>Error Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -373,14 +373,14 @@
                 <li><a href="webui.html">Main Table</a></li>
                 <li><a href="detail.html">Detail Viewer</a></li>
                 <li><a href="histrogram.html">Histogram Analyzer</a></li>
-                <li><a href="peeranalysis.html" class="active">Peer Analysis</a></li>
+                <li><a href="peeranalysis.html" class="active">Error Analysis</a></li>
             </ul>
         </div>
     </nav>
 
     <div class="main-content">
         <div class="left-panel">
-            <h2>Peer Analysis</h2>
+            <h2>Error Analysis</h2>
             
             <div class="upload-section">
                 <h3>Upload CSV File</h3>
@@ -389,9 +389,10 @@
                 <button class="btn" id="loadBtn" disabled>Load & Display Data</button>
                 <button class="btn" id="loadDefaultBtn">Load Default File</button>
                 <button class="btn" id="clearBtn" disabled>Clear Data</button>
+                <button class="btn" id="exportBtn" disabled>Export Error Analysis Data</button>
             </div>
 
-            <!-- Issuer Filter Dropdown for Peer Analysis -->
+            <!-- Issuer Filter Dropdown for Error Analysis -->
             <div id="issuer-filter-container-peer" class="filter-controls" style="margin-bottom: 16px; display: none; text-align: left;">
                 <label for="issuerDropdownPeer" style="font-weight: 500; margin-right: 8px;">Filter by Issuer (Peer):</label>
                 <select id="issuerDropdownPeer" style="padding: 6px; border: 1px solid #ced4da; border-radius: 4px; min-width: 220px;">
@@ -409,7 +410,7 @@
             
             <!-- Large Dataset Section -->
             <div class="large-dataset-section" style="margin-top: 40px;">
-                <h3>Large Dataset Viewer</h3>
+                <h3>Dataset of All Predictions</h3>
                 <div class="upload-section">
                     <h4>Upload Large CSV File (35k+ rows)</h4>
                     <input type="file" id="largeCsvInput" accept=".csv">
@@ -417,6 +418,7 @@
                     <button class="btn" id="loadLargeBtn" disabled>Load Large Dataset</button>
                     <button class="btn" id="loadDefaultLargeBtn">Load Default File</button>
                     <button class="btn" id="clearLargeBtn" disabled>Clear Large Dataset</button>
+                    <button class="btn" id="exportLargeBtn" disabled>Export Large Dataset</button>
                 </div>
 
                 <!-- Issuer Filter Dropdown for Large Dataset -->
@@ -600,6 +602,7 @@
                     document.getElementById('loadBtn').disabled = false;
                     document.getElementById('loadBtn').textContent = 'Load & Display Data';
                     document.getElementById('clearBtn').disabled = false;
+                    document.getElementById('exportBtn').disabled = false;
                     document.getElementById('showAllBtn').disabled = false;
                     document.getElementById('showAllIssuerBtn').disabled = false;
                 },
@@ -689,6 +692,7 @@
                     document.getElementById('loadLargeBtn').disabled = false;
                     document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
                     document.getElementById('clearLargeBtn').disabled = false;
+                    document.getElementById('exportLargeBtn').disabled = false;
                     updateShowSummaryButton();
                 },
                 error: function(error) {
@@ -713,6 +717,7 @@
             document.getElementById('largeCsvInput').value = '';
             document.getElementById('loadLargeBtn').disabled = true;
             document.getElementById('clearLargeBtn').disabled = true;
+            document.getElementById('exportLargeBtn').disabled = true;
             document.getElementById('summaryBox').style.display = 'none';
             updateShowSummaryButton();
             
@@ -737,6 +742,7 @@
             document.getElementById('csvInput').value = '';
             document.getElementById('loadBtn').disabled = true;
             document.getElementById('clearBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
             document.getElementById('showAllBtn').disabled = true;
             document.getElementById('showAllIssuerBtn').disabled = true;
             
@@ -763,7 +769,7 @@
             let largeApprovedRates = [];
 
             // --- Fix: Always filter large dataset by selectedIssuer for summary counts ---
-            // Check peer analysis dataset for record dates and approval rates
+            // Check error analysis dataset for record dates and approval rates
             if (csvData.length > 0 && issuerCol) {
                 const recordDateCol = headers.find(h => 
                     h.toLowerCase().includes('recorddate') || 
@@ -1006,11 +1012,11 @@
                         summaryText += '\n\nRejected Proposals Breakdown:';
                         
                         // Category-subcategory aggregation from large dataset
-                        // Use CATEGORY_ANNOTATED and SUBCATEGORY_ANNOTATED from Peer Analysis dataset (headers)
+                        // Use CATEGORY_ANNOTATED and SUBCATEGORY_ANNOTATED from Error Analysis dataset (headers)
                         const categoryAnnotatedCol = headers.find(h => h.trim().toLowerCase() === 'category_annotated');
                         const subcategoryAnnotatedCol = headers.find(h => h.trim().toLowerCase() === 'subcategory_annotated');
                         const categoryAggregation = {};
-                        // Use peerProposals from Peer Analysis dataset for breakdown
+                        // Use peerProposals from Error Analysis dataset for breakdown
                         const peerProposals = csvData.filter(row => (row[issuerCol] || '') === selectedIssuer);
                         peerProposals.forEach(row => {
                             const category = categoryAnnotatedCol ? (row[categoryAnnotatedCol] || 'Unknown') : 'Unknown';
@@ -1030,7 +1036,7 @@
                         // If you need the proposal master key, use a separate variable:
                         const proposalMasterKeyCol = headers.find(h => h.trim().toLowerCase() === 'proposal_master_key');
                         
-                        // Get individual proposal texts from peer analysis dataset
+                        // Get individual proposal texts from error analysis dataset
                         console.log('proposalCol resolved to:', proposalCol);
                         console.log('headers:', headers);
                         // Show a sample of the first 5 values for this column:
@@ -1059,7 +1065,7 @@
                                 }
                             });
                         } else {
-                            summaryText += '\n• Proposal text column not found in peer analysis dataset';
+                            summaryText += '\n• Proposal text column not found in error analysis dataset';
                         }
                     }
                 }
@@ -1816,6 +1822,40 @@
             return div.innerHTML;
         }
 
+        function convertToCSV(headers, data) {
+            // Helper function to escape CSV values
+            function escapeCSVValue(value) {
+                if (value === null || value === undefined) {
+                    return '';
+                }
+                const stringValue = String(value);
+                // If the value contains comma, quote, or newline, wrap in quotes and escape quotes
+                if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+                    return '"' + stringValue.replace(/"/g, '""') + '"';
+                }
+                return stringValue;
+            }
+
+            // Create CSV content
+            let csvContent = '';
+            
+            // Add headers
+            csvContent += headers.map(header => escapeCSVValue(header)).join(',') + '\n';
+            
+            // Add data rows
+            for (const row of data) {
+                if (Array.isArray(row)) {
+                    // Data is array of arrays
+                    csvContent += row.map(cell => escapeCSVValue(cell)).join(',') + '\n';
+                } else {
+                    // Data is array of objects (Papa Parse format)
+                    csvContent += headers.map(header => escapeCSVValue(row[header] || '')).join(',') + '\n';
+                }
+            }
+            
+            return csvContent;
+        }
+
         function showFileInfo(filename, rowCount, columnCount) {
             const infoDiv = document.getElementById('fileInfo');
             infoDiv.innerHTML = `
@@ -2295,7 +2335,7 @@
                                 }
 
                                 const parsedData = results.data;
-                                const filename = isLargeDataset ? 'Default Large Dataset' : 'Default Peer Analysis';
+                                const filename = isLargeDataset ? 'Default Large Dataset' : 'Default Error Analysis';
                                 
                                 console.log(`Loading ${filename} with ${parsedData.length} rows`);
                                 
@@ -2367,6 +2407,7 @@
             
             // Update button states
             document.getElementById('clearBtn').disabled = false;
+            document.getElementById('exportBtn').disabled = false;
             document.getElementById('showAllBtn').disabled = false;
             document.getElementById('showAllIssuerBtn').disabled = false;
         }
@@ -2408,6 +2449,7 @@
             
             // Update button states
             document.getElementById('clearLargeBtn').disabled = false;
+            document.getElementById('exportLargeBtn').disabled = false;
             updateShowSummaryButton();
         }
 
@@ -2472,6 +2514,96 @@
                         isSyncingDropdowns = false;
                     }
                 });
+            }
+
+            // Export Error Analysis Data button click handler
+            const exportBtn = document.getElementById('exportBtn');
+            console.log('Export button found:', exportBtn);
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function() {
+                    console.log('Export button clicked!');
+                    console.log('csvData length:', csvData ? csvData.length : 'undefined');
+                    if (!csvData || csvData.length === 0) {
+                        console.log('No data to export. Please load a file first.');
+                        return;
+                    }
+                    
+                    try {
+                        console.log('Creating CSV content...');
+                        // Create CSV content
+                        const csvContent = convertToCSV(headers, csvData);
+                        console.log('CSV content created, length:', csvContent.length);
+                        
+                        // Create and trigger download
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+                        
+                        // Generate default filename with timestamp
+                        const now = new Date();
+                        const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+                        const finalFilename = `error_analysis_${timestamp}.csv`;
+                        
+                        link.setAttribute('download', finalFilename);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        console.log('Triggering download for:', finalFilename);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        console.log('Download triggered successfully');
+                    } catch (error) {
+                        console.error('Error during export:', error);
+                    }
+                });
+            } else {
+                console.error('Export button not found!');
+            }
+
+            // Export Large Dataset button click handler
+            const exportLargeBtn = document.getElementById('exportLargeBtn');
+            console.log('Export Large button found:', exportLargeBtn);
+            if (exportLargeBtn) {
+                exportLargeBtn.addEventListener('click', function() {
+                    console.log('Export Large button clicked!');
+                    console.log('largeCsvData length:', largeCsvData ? largeCsvData.length : 'undefined');
+                    if (!largeCsvData || largeCsvData.length === 0) {
+                        console.log('No large dataset to export. Please load a large file first.');
+                        return;
+                    }
+                    
+                    try {
+                        console.log('Creating CSV content for large dataset...');
+                        // Create CSV content
+                        const csvContent = convertToCSV(largeHeaders, largeCsvData);
+                        console.log('CSV content created, length:', csvContent.length);
+                        
+                        // Create and trigger download
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+                        
+                        // Generate default filename with timestamp
+                        const now = new Date();
+                        const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+                        const finalFilename = `large_dataset_${timestamp}.csv`;
+                        
+                        link.setAttribute('download', finalFilename);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        console.log('Triggering large dataset download for:', finalFilename);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        console.log('Large dataset download triggered successfully');
+                    } catch (error) {
+                        console.error('Error during large dataset export:', error);
+                    }
+                });
+            } else {
+                console.error('Export Large button not found!');
             }
         });
 
