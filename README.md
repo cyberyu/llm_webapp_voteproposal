@@ -59,6 +59,16 @@ A FastAPI + OpenAI web application for interactive CSV upload, editing, LLM-base
 - Use LLM extraction for category suggestions.
 - Export processed data as needed.
 
+## Run Issuer Summary Generation
+
+To generate the HTML issuer summaries for error analysis, run:
+
+```bash
+python3 generate_issuer_summaries.py
+```
+
+This will process the issuer list and datasets, then create or update the `Error_analysis_topissuers_v11.html` file with the latest summaries.
+
 ## Security
 - Sensitive files (`*.csv`, `openai_key.csv`, `*.png`) are excluded from git by `.gitignore`.
 - **Never commit your OpenAI API key.**
