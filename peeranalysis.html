@@ -458,6 +458,9 @@
             <div class="chart-instructions">Click on bars to filter table data, click outside bars to show all</div>
             <div class="filter-controls">
                 <button class="filter-btn" id="showAllIssuerBtn" disabled>Show All Data</button>
+                <button class="export-btn" id="exportIssuerDistributionBtn" disabled>
+                    📋 Export Issuer List
+                </button>
             </div>
             <div id="issuerChartContainer">
                 <div class="no-chart">Upload and load a CSV file to see issuer distribution</div>
@@ -509,6 +512,23 @@
 
         // Debouncing for chart regeneration
         let chartRegenerationTimeout = null;
+
+        // Helper function to parse ForRatio values (handles both decimal and percentage formats)
+        function parseForRatio(val) {
+            if (typeof val === 'string') {
+                val = val.trim();
+                if (val.endsWith('%')) {
+                    const pct = parseFloat(val.replace('%', ''));
+                    if (!isNaN(pct)) return pct / 100;
+                }
+            }
+            const num = parseFloat(val);
+            if (!isNaN(num) && num > 1 && num <= 100) {
+                // If value is 45, treat as 0.45 (likely a percent without %)
+                return num / 100;
+            }
+            return isNaN(num) ? null : num;
+        }
 
         // File input change handler
         document.getElementById('csvInput').addEventListener('change', function(e) {
@@ -596,12 +616,16 @@
                     // Generate comparison chart if large dataset is available
                     generateComparisonChart();
                     
+                    // Populate issuer dropdowns for peer analysis
+                    populateIssuerDropdownsPeer(csvData);
+                    
                     // Update button states
                     document.getElementById('loadBtn').disabled = false;
                     document.getElementById('loadBtn').textContent = 'Load & Display Data';
                     document.getElementById('clearBtn').disabled = false;
                     document.getElementById('showAllBtn').disabled = false;
                     document.getElementById('showAllIssuerBtn').disabled = false;
+                    document.getElementById('exportIssuerDistributionBtn').disabled = false;
                 },
                 error: function(error) {
                     showError('Failed to read CSV file: ' + error.message);
@@ -620,6 +644,108 @@
         document.getElementById('showAllIssuerBtn').addEventListener('click', function() {
             showAllRows();
         });
+
+        // Export Issuer Distribution button click handler
+        document.getElementById('exportIssuerDistributionBtn').addEventListener('click', async function() {
+            console.log('Export Issuer Distribution button clicked');
+            console.log('lastIssuerDistributionLabels:', lastIssuerDistributionLabels);
+            console.log('Array length:', lastIssuerDistributionLabels ? lastIssuerDistributionLabels.length : 'undefined');
+            // If no labels are available, try to regenerate the chart first
+            if (!lastIssuerDistributionLabels || lastIssuerDistributionLabels.length === 0) {
+                console.log('No issuer labels found, attempting to regenerate issuer chart...');
+                // Try to regenerate the issuer chart to populate the labels
+                try {
+                    generateIssuerChart();
+                    // Check again after regeneration
+                    if (!lastIssuerDistributionLabels || lastIssuerDistributionLabels.length === 0) {
+                        alert('No issuer names to export. Please ensure:\n1. CSV data has been loaded\n2. The data contains an issuer/company column\n3. The issuer distribution chart has been generated');
+                        return;
+                    }
+                    console.log('Chart regenerated successfully, found', lastIssuerDistributionLabels.length, 'issuers');
+                } catch (error) {
+                    console.error('Error regenerating issuer chart:', error);
+                    alert('Could not generate issuer chart for export. Please check if valid data has been loaded.');
+                    return;
+                }
+            }
+            const csvContent = lastIssuerDistributionLabels.join('\n');
+            // Check if the File System Access API is supported
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const fileHandle = await window.showSaveFilePicker({
+                        suggestedName: 'issuer_distribution_list.csv',
+                        types: [{
+                            description: 'CSV files',
+                            accept: { 'text/csv': ['.csv'] }
+                        }]
+                    });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(csvContent);
+                    await writable.close();
+                    alert('Issuer distribution list saved successfully!');
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error saving file:', err);
+                        downloadFile(csvContent, 'issuer_distribution_list.csv');
+                    }
+                }
+            } else {
+                downloadFile(csvContent, 'issuer_distribution_list.csv');
+            }
+        });
+
+        // Export Issuer Names from Comparison Chart button click handler
+        document.getElementById('exportIssuerNamesBtn').addEventListener('click', async function() {
+            if (!lastComparisonChartLabels || lastComparisonChartLabels.length === 0) {
+                alert('No issuer names to export from comparison chart.');
+                return;
+            }
+            
+            const csvContent = lastComparisonChartLabels.join('\n');
+            
+            // Check if the File System Access API is supported
+            if ('showSaveFilePicker' in window) {
+                try {
+                    // Use modern File System Access API for directory/filename selection
+                    const fileHandle = await window.showSaveFilePicker({
+                        suggestedName: 'issuer_comparison_list.csv',
+                        types: [{
+                            description: 'CSV files',
+                            accept: { 'text/csv': ['.csv'] }
+                        }]
+                    });
+                    
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(csvContent);
+                    await writable.close();
+                    
+                    alert('Issuer comparison list saved successfully!');
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error saving file:', err);
+                        // Fallback to traditional download method
+                        downloadFile(csvContent, 'issuer_comparison_list.csv');
+                    }
+                }
+            } else {
+                // Fallback for browsers that don't support File System Access API
+                downloadFile(csvContent, 'issuer_comparison_list.csv');
+            }
+        });
+
+        // Helper function for file download fallback
+        function downloadFile(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'issuer_names.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
 
         // Management proposal filter checkbox handler
         document.getElementById('mgmtProposalFilter').addEventListener('change', function() {
@@ -685,6 +811,9 @@
                     // Generate comparison chart if rejected dataset is available
                     generateComparisonChart();
                     
+                    // Populate issuer dropdowns for large dataset
+                    populateIssuerDropdownsLarge(largeCsvData);
+                    
                     // Update button states
                     document.getElementById('loadLargeBtn').disabled = false;
                     document.getElementById('loadLargeBtn').textContent = 'Load Large Dataset';
@@ -739,6 +868,7 @@
             document.getElementById('clearBtn').disabled = true;
             document.getElementById('showAllBtn').disabled = true;
             document.getElementById('showAllIssuerBtn').disabled = true;
+            document.getElementById('exportIssuerDistributionBtn').disabled = true;
             
             // Clear chart
             categoryChart = safeDestroyChart(categoryChart);
@@ -753,10 +883,56 @@
         document.getElementById('showSummaryBtn').addEventListener('click', function() {
             const summaryBox = document.getElementById('summaryBox');
             const peerDropdown = document.getElementById('issuerDropdownPeer');
-            const selectedIssuer = peerDropdown ? peerDropdown.value : '';
+            const largeDropdown = document.getElementById('issuerDropdownLarge');
+            // Use the selected issuer from either dropdown that is valid in both datasets
+            let selectedIssuer = '';
+            const peerValue = peerDropdown ? peerDropdown.value : '';
+            const largeValue = largeDropdown ? largeDropdown.value : '';
+            const peerIssuers = csvData.length && issuerCol ? [...new Set(csvData.map(row => row[issuerCol]).filter(Boolean))] : [];
+            const largeIssuers = largeCsvData.length && largeIssuerCol ? [...new Set(largeCsvData.map(row => row[largeIssuerCol]).filter(Boolean))] : [];
+            if (peerValue && peerValue !== 'NONE' && largeIssuers.includes(peerValue)) {
+                selectedIssuer = peerValue;
+            } else if (largeValue && largeValue !== 'NONE' && peerIssuers.includes(largeValue)) {
+                selectedIssuer = largeValue;
+            }
+            if (!selectedIssuer) {
+                summaryBox.innerHTML = '<div class="error-message">No valid issuer selected in both datasets.</div>';
+                summaryBox.style.display = 'block';
+                return;
+            }
             
-            // Get record dates, services, mgmt recommendations, and approval rates for the selected issuer from both datasets
+            // Debug: Log current datasets and selected issuer
+            console.log('=== Show Summary Debug ===');
+            console.log('Selected Issuer:', selectedIssuer);
+            console.log('Peer dataset (csvData) length:', csvData.length);
+            console.log('Large dataset (largeCsvData) length:', largeCsvData.length);
+            console.log('Peer headers:', headers);
+            console.log('Large headers:', largeHeaders);
+            
+            // Debug: Check if UPL LIMITED exists in datasets
+            if (csvData.length > 0 && issuerCol) {
+                const allPeerIssuers = [...new Set(csvData.map(row => row[issuerCol]))].sort();
+                console.log('All issuers in peer dataset:', allPeerIssuers);
+                const uplInPeer = csvData.filter(row => (row[issuerCol] || '').includes('UPL'));
+                console.log('UPL-related rows in peer dataset:', uplInPeer.length);
+                if (uplInPeer.length > 0) {
+                    console.log('Sample UPL peer row:', uplInPeer[0]);
+                }
+            }
+            
+            if (largeCsvData.length > 0 && largeIssuerCol) {
+                const allLargeIssuers = [...new Set(largeCsvData.map(row => row[largeIssuerCol]))].sort();
+                console.log('All issuers in large dataset:', allLargeIssuers);
+                const uplInLarge = largeCsvData.filter(row => (row[largeIssuerCol] || '').includes('UPL'));
+                console.log('UPL-related rows in large dataset:', uplInLarge.length);
+                if (uplInLarge.length > 0) {
+                    console.log('Sample UPL large row:', uplInLarge[0]);
+                }
+            }
+            
+            // Get record dates, services, mgmt recommendations, job numbers, and approval rates for the selected issuer from both datasets
             let allRecordDates = [];
+            let allJobNumbers = [];
             let allServices = [];
             let allMgmtRecs = [];
             let peerApprovalRates = [];
@@ -772,19 +948,103 @@
                     h.toLowerCase().includes('meetingdate') ||
                     h.toLowerCase().includes('meeting_date')
                 );
+                const mlDateCol = headers.find(h => 
+                    h.toLowerCase().includes('ml_date') || 
+                    h.toLowerCase().includes('mldate') ||
+                    h.toLowerCase().includes('ml date')
+                );
+                const mtDateCol = headers.find(h => 
+                    h.toLowerCase().includes('mt_date') || 
+                    h.toLowerCase().includes('mtdate') ||
+                    h.toLowerCase().includes('mt date')
+                );
+                const jobNumberCol = headers.find(h => 
+                    h.toLowerCase().includes('job_number') || 
+                    h.toLowerCase().includes('jobnumber') ||
+                    h.toLowerCase().includes('job number')
+                );
                 const forRatioCol = headers.find(h => 
                     h.toLowerCase().includes('forratio') && h.toLowerCase().includes('true')
                 );
                 
                 const peerRows = csvData.filter(row => (row[issuerCol] || '') === selectedIssuer);
+                console.log('Peer rows for', selectedIssuer, ':', peerRows.length);
+                console.log('Issuer column name:', issuerCol);
+                console.log('Record date column in peer data:', recordDateCol);
+                console.log('ML date column in peer data:', mlDateCol);
+                console.log('MT date column in peer data:', mtDateCol);
+                console.log('Job number column in peer data:', jobNumberCol);
+                console.log('Available headers in peer data:', headers);
+                
+                // Debug: Show exact issuer values to check for mismatches
+                if (peerRows.length > 0) {
+                    console.log('Sample peer row for debugging:', peerRows[0]);
+                } else {
+                    console.log('No rows found! Let me check exact issuer names...');
+                    const allIssuerValues = csvData.map(row => row[issuerCol]).filter(Boolean);
+                    const uniqueIssuers = [...new Set(allIssuerValues)];
+                    console.log('Exact issuer names in peer data:', uniqueIssuers);
+                    console.log('Looking for exact match of:', `"${selectedIssuer}"`);
+                    const possibleMatches = uniqueIssuers.filter(name => name && name.includes('UPL'));
+                    console.log('Possible UPL matches:', possibleMatches);
+                }
                 
                 if (recordDateCol) {
                     const peerDates = peerRows.map(row => row[recordDateCol]).filter(Boolean);
+                    console.log('Peer record dates found:', peerDates);
+                    console.log('Unique peer record dates:', [...new Set(peerDates)]);
                     allRecordDates.push(...peerDates);
                 }
                 
+                if (mlDateCol) {
+                    const peerMLDates = peerRows.map(row => row[mlDateCol]).filter(Boolean);
+                    console.log('Peer ML dates found:', peerMLDates);
+                    console.log('Unique peer ML dates:', [...new Set(peerMLDates)]);
+                    allRecordDates.push(...peerMLDates);
+                }
+                
+                if (mtDateCol) {
+                    const peerMTDates = peerRows.map(row => row[mtDateCol]).filter(Boolean);
+                    console.log('Peer MT dates found:', peerMTDates);
+                    console.log('Unique peer MT dates:', [...new Set(peerMTDates)]);
+                    allRecordDates.push(...peerMTDates);
+                }
+                
+                if (jobNumberCol) {
+                    const peerJobNumbers = peerRows.map(row => row[jobNumberCol]).filter(Boolean);
+                    console.log('Peer job numbers found:', peerJobNumbers);
+                    console.log('Unique peer job numbers:', [...new Set(peerJobNumbers)]);
+                    allJobNumbers.push(...peerJobNumbers);
+                }
+                
+                // Debug: Show ALL date columns and their values for the selected issuer
+                console.log('=== DETAILED DATE ANALYSIS FOR', selectedIssuer, '===');
+                if (peerRows.length > 0) {
+                    console.log('Sample row data for debugging:');
+                    const sampleRow = peerRows[0];
+                    headers.forEach(header => {
+                        if (header.toLowerCase().includes('date') || header.toLowerCase().includes('job')) {
+                            console.log(`  ${header}: "${sampleRow[header]}"`);
+                        }
+                    });
+                    
+                    // Show all date and job number values for this issuer
+                    const allDateColumns = headers.filter(h => h.toLowerCase().includes('date'));
+                    const allJobColumns = headers.filter(h => h.toLowerCase().includes('job'));
+                    console.log('All date columns in peer data:', allDateColumns);
+                    console.log('All job columns in peer data:', allJobColumns);
+                    allDateColumns.forEach(col => {
+                        const dates = peerRows.map(row => row[col]).filter(Boolean);
+                        console.log(`  ${col} values:`, [...new Set(dates)]);
+                    });
+                    allJobColumns.forEach(col => {
+                        const jobs = peerRows.map(row => row[col]).filter(Boolean);
+                        console.log(`  ${col} values:`, [...new Set(jobs)]);
+                    });
+                }
+                
                 if (forRatioCol) {
-                    const peerRates = peerRows.map(row => parseFloat(row[forRatioCol])).filter(rate => !isNaN(rate));
+                    const peerRates = peerRows.map(row => parseForRatio(row[forRatioCol])).filter(rate => rate !== null);
                     peerApprovalRates.push(...peerRates);
                 }
             }
@@ -797,6 +1057,21 @@
                     h.toLowerCase().includes('record date') ||
                     h.toLowerCase().includes('meetingdate') ||
                     h.toLowerCase().includes('meeting_date')
+                );
+                const mlDateCol = largeHeaders.find(h => 
+                    h.toLowerCase().includes('ml_date') || 
+                    h.toLowerCase().includes('mldate') ||
+                    h.toLowerCase().includes('ml date')
+                );
+                const mtDateCol = largeHeaders.find(h => 
+                    h.toLowerCase().includes('mt_date') || 
+                    h.toLowerCase().includes('mtdate') ||
+                    h.toLowerCase().includes('mt date')
+                );
+                const jobNumberCol = largeHeaders.find(h => 
+                    h.toLowerCase().includes('job_number') || 
+                    h.toLowerCase().includes('jobnumber') ||
+                    h.toLowerCase().includes('job number')
                 );
                 const serviceCol = largeHeaders.find(h => 
                     h.toLowerCase().includes('service') || 
@@ -813,64 +1088,145 @@
                 );
                 // --- Only use rows for the selected issuer for all calculations below ---
                 const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
+                console.log('Large rows for', selectedIssuer, ':', largeRows.length);
+                console.log('Large issuer column name:', largeIssuerCol);
+                console.log('Record date column in large data:', recordDateCol);
+                console.log('ML date column in large data:', mlDateCol);
+                console.log('MT date column in large data:', mtDateCol);
+                console.log('Job number column in large data:', jobNumberCol);
+                console.log('Available headers in large data:', largeHeaders);
+                
+                // Debug: Show exact issuer values to check for mismatches
+                if (largeRows.length > 0) {
+                    console.log('Sample large row for debugging:', largeRows[0]);
+                } else {
+                    console.log('No rows found in large dataset! Let me check exact issuer names...');
+                    const allLargeIssuerValues = largeCsvData.map(row => row[largeIssuerCol]).filter(Boolean);
+                    const uniqueLargeIssuers = [...new Set(allLargeIssuerValues)];
+                    console.log('Exact issuer names in large data:', uniqueLargeIssuers);
+                    console.log('Looking for exact match of:', `"${selectedIssuer}"`);
+                    const possibleLargeMatches = uniqueLargeIssuers.filter(name => name && name.includes('UPL'));
+                    console.log('Possible UPL matches in large data:', possibleLargeMatches);
+                }
 
                 if (recordDateCol) {
                     const largeDates = largeRows.map(row => row[recordDateCol]).filter(Boolean);
+                    console.log('Large record dates found:', largeDates);
+                    console.log('Unique large record dates:', [...new Set(largeDates)]);
                     allRecordDates.push(...largeDates);
                 }
-
-                // Only aggregate services and mgmt recommendations from large dataset (no double counting)
-                if (serviceCol) {
-                    const largeServices = largeRows.map(row => row[serviceCol]).filter(Boolean);
-                    allServices.push(...largeServices);
+                
+                if (mlDateCol) {
+                    const largeMLDates = largeRows.map(row => row[mlDateCol]).filter(Boolean);
+                    console.log('Large ML dates found:', largeMLDates);
+                    console.log('Unique large ML dates:', [...new Set(largeMLDates)]);
+                    allRecordDates.push(...largeMLDates);
                 }
-
-                if (mgmtRecCol) {
-                    const largeMgmtRecs = largeRows.map(row => row[mgmtRecCol]).filter(Boolean);
-                    allMgmtRecs.push(...largeMgmtRecs);
+                
+                if (mtDateCol) {
+                    const largeMTDates = largeRows.map(row => row[mtDateCol]).filter(Boolean);
+                    console.log('Large MT dates found:', largeMTDates);
+                    console.log('Unique large MT dates:', [...new Set(largeMTDates)]);
+                    allRecordDates.push(...largeMTDates);
+                }
+                
+                if (jobNumberCol) {
+                    const largeJobNumbers = largeRows.map(row => row[jobNumberCol]).filter(Boolean);
+                    console.log('Large job numbers found:', largeJobNumbers);
+                    console.log('Unique large job numbers:', [...new Set(largeJobNumbers)]);
+                    allJobNumbers.push(...largeJobNumbers);
+                }
+                
+                // Debug: Show ALL date columns and their values for the selected issuer
+                console.log('=== DETAILED LARGE DATASET DATE ANALYSIS FOR', selectedIssuer, '===');
+                if (largeRows.length > 0) {
+                    console.log('Sample large row data for debugging:');
+                    const sampleLargeRow = largeRows[0];
+                    largeHeaders.forEach(header => {
+                        if (header.toLowerCase().includes('date') || header.toLowerCase().includes('job')) {
+                            console.log(`  ${header}: "${sampleLargeRow[header]}"`);
+                        }
+                    });
+                    
+                    // Show all date and job number values for this issuer
+                    const allLargeDateColumns = largeHeaders.filter(h => h.toLowerCase().includes('date'));
+                    const allLargeJobColumns = largeHeaders.filter(h => h.toLowerCase().includes('job'));
+                    console.log('All date columns in large data:', allLargeDateColumns);
+                    console.log('All job columns in large data:', allLargeJobColumns);
+                    allLargeDateColumns.forEach(col => {
+                        const dates = largeRows.map(row => row[col]).filter(Boolean);
+                        console.log(`  ${col} values:`, [...new Set(dates)]);
+                    });
+                    allLargeJobColumns.forEach(col => {
+                        const jobs = largeRows.map(row => row[col]).filter(Boolean);
+                        console.log(`  ${col} values:`, [...new Set(jobs)]);
+                    });
                 }
 
                 if (forRatioCol) {
                     // Only approved proposals (>= 0.5) for approval rates
-                    const largeRates = largeRows.map(row => parseFloat(row[forRatioCol]))
-                        .filter(rate => !isNaN(rate) && rate >= 0.5);
+                    const largeRates = largeRows.map(row => parseForRatio(row[forRatioCol]))
+                        .filter(rate => rate !== null && rate >= 0.5);
                     largeApprovedRates.push(...largeRates);
                 }
             }
             
             // Normalize dates to consistent format and remove duplicates
             const normalizedDates = [...new Set(allRecordDates.map(date => {
-                // Helper to parse DD/MM/YYYY or DD-MM-YYYY as day first
-                function parseDayFirst(d) {
+                // Helper to parse different date formats
+                function parseDate(d) {
                     if (typeof d !== 'string') return null;
+                    
+                    // Try MM/DD/YYYY or MM-DD-YYYY (US format)
                     let m = d.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
                     if (m) {
-                        // DD/MM/YYYY or DD-MM-YYYY
-                        const day = parseInt(m[1], 10);
-                        const month = parseInt(m[2], 10);
+                        const month = parseInt(m[1], 10);
+                        const day = parseInt(m[2], 10);
                         const year = parseInt(m[3], 10);
                         // JS months are 0-based
-                        return new Date(year, month - 1, day);
+                        const usDate = new Date(year, month - 1, day);
+                        console.log(`Parsing "${d}" as MM/DD/YYYY: ${usDate.toISOString()}`);
+                        return usDate;
                     }
-                    // Try YYYY-MM-DD
+                    
+                    // Try YYYY-MM-DD format
                     m = d.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
                     if (m) {
-                        return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+                        const isoDate = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+                        console.log(`Parsing "${d}" as YYYY-MM-DD: ${isoDate.toISOString()}`);
+                        return isoDate;
                     }
+                    
                     // Try Date constructor fallback
                     const dt = new Date(d);
-                    if (!isNaN(dt.getTime())) return dt;
+                    if (!isNaN(dt.getTime())) {
+                        console.log(`Parsing "${d}" with Date constructor: ${dt.toISOString()}`);
+                        return dt;
+                    }
+                    
+                    console.log(`Failed to parse date: "${d}"`);
                     return null;
                 }
-                const parsedDate = parseDayFirst(date);
+                
+                const parsedDate = parseDate(date);
                 if (parsedDate && !isNaN(parsedDate.getTime())) {
-                    // Exclude future dates after 2025-06-01
-                    const cutoff = new Date(2025, 5, 1); // June is month 5 (0-based)
-                    if (parsedDate > cutoff) return null;
+                    // Remove the cutoff filter temporarily for debugging
+                    // const cutoff = new Date(2025, 5, 1); // June is month 5 (0-based)
+                    // if (parsedDate > cutoff) return null;
+                    console.log(`Successfully normalized "${date}" to: ${parsedDate.toISOString().split('T')[0]}`);
                     return parsedDate.toISOString().split('T')[0];
                 }
                 return null;
             }).filter(Boolean))];
+            
+            // Debug: Show final results
+            console.log('=== FINAL DATE PROCESSING RESULTS ===');
+            console.log('Raw dates collected:', allRecordDates);
+            console.log('Normalized dates:', normalizedDates);
+            console.log('Total unique dates found:', normalizedDates.length);
+            console.log('Raw job numbers collected:', allJobNumbers);
+            console.log('Unique job numbers:', [...new Set(allJobNumbers)]);
+            console.log('Total unique job numbers found:', [...new Set(allJobNumbers)].length);
             
             // Sort dates from past to present
             normalizedDates.sort((a, b) => {
@@ -935,9 +1291,17 @@
             let summaryText = selectedIssuer || 'No issuer selected';
             
             if (normalizedDates.length > 0) {
-                summaryText += '\n\nRecord Date(s): ' + normalizedDates.join(', ');
+                summaryText += '\n\nRecord Date(s) / ML Date(s) / MT Date(s): ' + normalizedDates.join(', ');
             } else {
-                summaryText += '\n\nNo record dates found for this issuer.';
+                summaryText += '\n\nNo record dates, ML dates, or MT dates found for this issuer.';
+            }
+            
+            // Add job numbers to summary
+            const uniqueJobNumbers = [...new Set(allJobNumbers)];
+            if (uniqueJobNumbers.length > 0) {
+                summaryText += '\n\nJob Number(s): ' + uniqueJobNumbers.join(', ');
+            } else {
+                summaryText += '\n\nNo job numbers found for this issuer.';
             }
             
             if (serviceSummary) {
@@ -974,8 +1338,8 @@
                     // --- Only count proposals for the selected issuer ---
                     const largeRows = largeCsvData.filter(row => (row[largeIssuerCol] || '') === selectedIssuer);
                     largeRows.forEach(row => {
-                        const forRatio = parseFloat(row[forRatioCol]);
-                        if (!isNaN(forRatio)) {
+                        const forRatio = parseForRatio(row[forRatioCol]);
+                        if (forRatio !== null) {
                             if (forRatio < 0.5) {
                                 rejectedCount++;
                             } else if (forRatio >= 0.5) {
@@ -998,8 +1362,8 @@
                     // Get rejected proposals from large dataset for category aggregation
                     const rejectedProposalsLarge = largeCsvData.filter(row => {
                         const issuerMatch = (row[largeIssuerCol] || '') === selectedIssuer;
-                        const forRatio = parseFloat(row[forRatioCol]);
-                        return issuerMatch && !isNaN(forRatio) && forRatio < 0.5;
+                        const forRatio = parseForRatio(row[forRatioCol]);
+                        return issuerMatch && forRatio !== null && forRatio < 0.5;
                     });
                     
                     if (rejectedProposalsLarge.length > 0) {
@@ -1075,8 +1439,8 @@
             if (forRatioColLarge && categoryColLarge && selectedIssuer) {
                 const approvedProposalsLarge = largeCsvData.filter(row => {
                     const issuerMatch = (row[largeIssuerCol] || '') === selectedIssuer;
-                    const forRatio = parseFloat(row[forRatioColLarge]);
-                    return issuerMatch && !isNaN(forRatio) && forRatio >= 0.5;
+                    const forRatio = parseForRatio(row[forRatioColLarge]);
+                    return issuerMatch && forRatio !== null && forRatio >= 0.5;
                 });
 
                 if (approvedProposalsLarge.length > 0) {
@@ -1153,12 +1517,20 @@
                 document.getElementById('summaryBox').style.display = 'none';
                 return;
             }
-            
-            // Check if both dropdowns have the same issuer selected (and not empty)
+            // Get selected issuer from either dropdown
             const peerValue = peerDropdown ? peerDropdown.value : '';
             const largeValue = largeDropdown ? largeDropdown.value : '';
-            
-            if (peerValue && largeValue && peerValue === largeValue && peerValue !== 'NONE') {
+            // Get all issuers in each dataset
+            const peerIssuers = csvData.length && issuerCol ? [...new Set(csvData.map(row => row[issuerCol]).filter(Boolean))] : [];
+            const largeIssuers = largeCsvData.length && largeIssuerCol ? [...new Set(largeCsvData.map(row => row[largeIssuerCol]).filter(Boolean))] : [];
+            // Find a valid issuer selected in either dropdown that exists in both datasets
+            let validIssuer = null;
+            if (peerValue && peerValue !== 'NONE' && largeIssuers.includes(peerValue)) {
+                validIssuer = peerValue;
+            } else if (largeValue && largeValue !== 'NONE' && peerIssuers.includes(largeValue)) {
+                validIssuer = largeValue;
+            }
+            if (validIssuer) {
                 btn.disabled = false;
             } else {
                 btn.disabled = true;
@@ -1308,10 +1680,16 @@
         }
 
         function generateIssuerChart() {
+            console.log('🔄 Starting generateIssuerChart function');
+            
             // Find issuer column (case-insensitive)
             issuerCol = headers.find(h => h.toLowerCase().includes('issuer') || h.toLowerCase().includes('company') || h.toLowerCase().includes('firm')) || null;
             
+            console.log(`Headers available: ${headers ? headers.length : 0}`, headers);
+            console.log(`Issuer column detected: "${issuerCol}"`);
+            
             if (!issuerCol) {
+                console.log('❌ No issuer column found in headers');
                 document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">No issuer column found in the data</div>';
                 return;
             }
@@ -1332,11 +1710,15 @@
                     }
                 }) : csvData;
             
+            console.log(`Data to aggregate: ${dataToAggregate.length} rows from total ${csvData.length}`);
+            
             const aggregation = {};
             dataToAggregate.forEach(row => {
                 const issuer = row[issuerCol] || 'Unknown';
                 aggregation[issuer] = (aggregation[issuer] || 0) + 1;
             });
+
+            console.log(`Aggregated ${Object.keys(aggregation).length} unique issuers`);
 
             // Filter out bars with count 0
             const filteredData = Object.entries(aggregation)
@@ -1348,6 +1730,7 @@
                 .slice(0, 30);
 
             if (sortedData.length === 0) {
+                console.log('❌ No valid issuer data found after sorting');
                 document.getElementById('issuerChartContainer').innerHTML = '<div class="no-chart">No valid issuer data found</div>';
                 return;
             }
@@ -1355,6 +1738,13 @@
             // Prepare chart data
             const labels = sortedData.map(item => item[0]);
             const counts = sortedData.map(item => item[1]);
+            
+                       
+            // Store issuer labels for export
+            lastIssuerDistributionLabels = labels;
+            console.log('✅ Issuer chart generated - stored labels for export:', labels.length, 'items');
+            console.log('First 5 labels:', labels.slice(0, 5));
+            console.log('lastIssuerDistributionLabels variable state:', lastIssuerDistributionLabels);
 
             // Generate colors with proper index mapping
             let highlightIndex = -1;
@@ -1416,7 +1806,11 @@
                         y: {
                             ticks: {
                                 maxTicksLimit: 30,
-                                font: { size: 10 }
+                                autoSkip: false,
+                                font: { size: 10 },
+                                callback: function(value, index) {
+                                    return labels[index];
+                                }
                             }
                         }
                     },
@@ -1463,6 +1857,7 @@
 
         // Store last shown issuer labels for export
         let lastComparisonChartLabels = [];
+        let lastIssuerDistributionLabels = [];
 
         function generateComparisonChart() {
             // Only generate if both datasets are loaded
@@ -1560,9 +1955,9 @@
             
             largeDataToAggregate.forEach(row => {
                 const issuer = row[largeIssuerCol] || 'Unknown';
-                const forRatio = parseFloat(row[forRatioColumn]);
+                const forRatio = parseForRatio(row[forRatioColumn]);
                 
-                if (!isNaN(forRatio)) {
+                if (forRatio !== null) {
                     if (forRatio < 0.5) {
                         // Rejected: ForRatioAmongVoted_true < 0.5
                         rejectedAggregation[issuer] = (rejectedAggregation[issuer] || 0) + 1;

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Export Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .button { padding: 10px 20px; margin: 10px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Minimal Export Test</h1>
+    
+    <button class="button" onclick="simulateChartGeneration()">Simulate Chart Generation</button>
+    <button class="button" onclick="testExport()">Test Export Function</button>
+    <button class="button" onclick="checkVariableState()">Check Variable State</button>
+    <button class="button" id="exportIssuerListBtn" disabled>Export Issuer List</button>
+    
+    <div class="debug" id="debug"></div>
+    
+    <script>
+        // Simulate the export variables
+        let lastIssuerDistributionLabels = [];
+        
+        function log(message) {
+            const debugDiv = document.getElementById('debug');
+            debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+        
+        function simulateChartGeneration() {
+            log('🔄 Simulating chart generation...');
+            
+            // Simulate the exact same process as in generateIssuerChart()
+            const mockData = [
+                ['Apple Inc.', 5],
+                ['Microsoft Corp.', 3],
+                ['Amazon.com Inc.', 7],
+                ['Google LLC', 2],
+                ['Tesla Inc.', 4]
+            ];
+            
+            // This mimics the exact lines from generateIssuerChart()
+            const labels = mockData.map(item => item[0]);
+            
+            // Store issuer labels for export
+            lastIssuerDistributionLabels = labels;
+            log(`✅ Chart generated - stored labels for export: ${labels.length} items`);
+            log(`First 3 labels: ${labels.slice(0, 3).join(', ')}`);
+            log(`Variable state: ${JSON.stringify(lastIssuerDistributionLabels)}`);
+            // Enable export button
+            document.getElementById('exportIssuerListBtn').disabled = false;
+        }
+        
+        function checkVariableState() {
+            log('🔍 Checking variable state...');
+            log(`lastIssuerDistributionLabels type: ${typeof lastIssuerDistributionLabels}`);
+            log(`Is array: ${Array.isArray(lastIssuerDistributionLabels)}`);
+            log(`Length: ${lastIssuerDistributionLabels ? lastIssuerDistributionLabels.length : 'undefined'}`);
+            log(`Content: ${JSON.stringify(lastIssuerDistributionLabels)}`);
+        }
+        
+        function testExport() {
+            log('📤 Testing export function...');
+            log(`lastIssuerDistributionLabels: ${JSON.stringify(lastIssuerDistributionLabels)}`);
+            log(`Array length: ${lastIssuerDistributionLabels ? lastIssuerDistributionLabels.length : 'undefined'}`);
+            
+            if (!lastIssuerDistributionLabels || lastIssuerDistributionLabels.length === 0) {
+                log('❌ No issuer names to export from distribution chart. Make sure the issuer chart has been generated first.');
+                return;
+            }
+            
+            const csvContent = lastIssuerDistributionLabels.join('\n');
+            log(`✅ Export successful! CSV Content:\n${csvContent}`);
+            
+            // Actually try to download
+            try {
+                downloadFile('test_issuer_list.csv', csvContent);
+                log('✅ Download function executed');
+            } catch (error) {
+                log(`❌ Download error: ${error.message}`);
+            }
+        }
+        
+        function downloadFile(filename, content) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+        
+        // Initialize
+        log('🚀 Minimal export test initialized');
+        checkVariableState();
+        
+        // Add export button handler
+        document.getElementById('exportIssuerListBtn').addEventListener('click', function() {
+            log('📤 Export Issuer List button clicked...');
+            if (!lastIssuerDistributionLabels || lastIssuerDistributionLabels.length === 0) {
+                log('❌ No issuer names to export from distribution chart. Make sure the issuer chart has been generated first.');
+                return;
+            }
+            const csvContent = lastIssuerDistributionLabels.join('\n');
+            try {
+                downloadFile('issuer_distribution_list.csv', csvContent);
+                log('✅ Download function executed');
+                // Optionally disable after export
+                document.getElementById('exportIssuerListBtn').disabled = true;
+            } catch (error) {
+                log(`❌ Download error: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

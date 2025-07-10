@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Show Summary Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        code { background: #f1f1f1; padding: 2px 4px; border-radius: 3px; }
+        .iframe-container { height: 600px; border: 1px solid #ccc; border-radius: 5px; overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Complete Show Summary Button Test</h1>
+    
+    <div class="status success">
+        <h3>✅ Fix Applied Successfully</h3>
+        <p><strong>Issue Fixed:</strong> <code>parseForRatio is not defined</code> error</p>
+        <p><strong>Solution:</strong> Moved function definition from line 1910 to line 517 (before all usage points)</p>
+        <p><strong>Files Modified:</strong> peeranalysis.html</p>
+    </div>
+    
+    <div class="test-section">
+        <h3>🧪 Test Instructions</h3>
+        <ol>
+            <li><strong>Open Developer Tools:</strong> Press F12 and go to Console tab</li>
+            <li><strong>Load Default Data:</strong> Click both "Load Default File" buttons in the iframe below</li>
+            <li><strong>Wait for Loading:</strong> Ensure both datasets finish loading</li>
+            <li><strong>Select an Issuer:</strong> Choose an issuer from either dropdown filter</li>
+            <li><strong>Enable Summary Button:</strong> Verify the "Show Summary" button becomes enabled</li>
+            <li><strong>Click Show Summary:</strong> Click the button and check for summary content</li>
+            <li><strong>Check Console:</strong> Look for debug output and ensure no errors</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h3>📊 Expected Behavior</h3>
+        <div class="status info">
+            <h4>Button States:</h4>
+            <ul>
+                <li>🔴 Disabled when no data is loaded</li>
+                <li>🔴 Disabled when only one dataset is loaded</li>
+                <li>🔴 Disabled when both datasets loaded but no issuer selected</li>
+                <li>🟢 Enabled when both datasets loaded and valid issuer selected</li>
+            </ul>
+        </div>
+        
+        <div class="status info">
+            <h4>Summary Content Should Include:</h4>
+            <ul>
+                <li>📍 Issuer name</li>
+                <li>📅 Record dates (normalized format)</li>
+                <li>🔢 Job numbers</li>
+                <li>🏢 Services</li>
+                <li>📋 Management recommendations</li>
+                <li>📈 Approval rates (peer analysis vs large dataset)</li>
+                <li>📊 Proposal counts (rejected vs approved)</li>
+                <li>📝 Detailed breakdown of rejected proposals</li>
+                <li>✅ Detailed breakdown of approved proposals</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🖥️ Test Environment</h3>
+        <div class="iframe-container">
+            <iframe src="http://localhost:8000/peeranalysis.html"></iframe>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🔍 Manual Verification Steps</h3>
+        <button onclick="openInNewTab()">🚀 Open in New Tab</button>
+        <button onclick="showTestChecklist()">📝 Show Test Checklist</button>
+        <button onclick="runFunctionTest()">⚙️ Test parseForRatio Function</button>
+        
+        <div id="checklist" style="display: none; margin-top: 15px;">
+            <div class="status warning">
+                <h4>📋 Test Checklist:</h4>
+                <label><input type="checkbox"> 1. No console errors when page loads</label><br>
+                <label><input type="checkbox"> 2. Both "Load Default File" buttons work</label><br>
+                <label><input type="checkbox"> 3. Data loads successfully (check file info displays)</label><br>
+                <label><input type="checkbox"> 4. Issuer dropdowns populate with data</label><br>
+                <label><input type="checkbox"> 5. Show Summary button enables when issuer selected</label><br>
+                <label><input type="checkbox"> 6. Clicking Show Summary generates content</label><br>
+                <label><input type="checkbox"> 7. Summary box displays with comprehensive data</label><br>
+                <label><input type="checkbox"> 8. Console shows debug output without errors</label><br>
+                <label><input type="checkbox"> 9. parseForRatio function works correctly</label><br>
+                <label><input type="checkbox"> 10. All approval/rejection logic works properly</label><br>
+            </div>
+        </div>
+        
+        <div id="functionTest" style="display: none; margin-top: 15px;">
+            <div class="status success" id="functionTestResults"></div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🐛 Debugging Tips</h3>
+        <div class="status info">
+            <h4>If issues persist:</h4>
+            <ul>
+                <li><strong>Check Console:</strong> Look for any remaining JavaScript errors</li>
+                <li><strong>Verify Data Loading:</strong> Ensure both datasets load completely</li>
+                <li><strong>Test Different Issuers:</strong> Try selecting various issuers from dropdowns</li>
+                <li><strong>Check Network Tab:</strong> Verify default files are loading successfully</li>
+                <li><strong>Clear Cache:</strong> Refresh with Ctrl+F5 to ensure latest code is loaded</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        function openInNewTab() {
+            window.open('http://localhost:8000/peeranalysis.html', '_blank');
+        }
+        
+        function showTestChecklist() {
+            const checklist = document.getElementById('checklist');
+            checklist.style.display = checklist.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function runFunctionTest() {
+            // Test the parseForRatio function
+            function parseForRatio(val) {
+                if (typeof val === 'string') {
+                    val = val.trim();
+                    if (val.endsWith('%')) {
+                        const pct = parseFloat(val.replace('%', ''));
+                        if (!isNaN(pct)) return pct / 100;
+                    }
+                }
+                const num = parseFloat(val);
+                if (!isNaN(num) && num > 1 && num <= 100) {
+                    return num / 100;
+                }
+                return isNaN(num) ? null : num;
+            }
+            
+            const testCases = [
+                { input: '45%', expected: 0.45 },
+                { input: '0.45', expected: 0.45 },
+                { input: 45, expected: 0.45 },
+                { input: 0.75, expected: 0.75 },
+                { input: '85%', expected: 0.85 },
+                { input: 'invalid', expected: null },
+                { input: '', expected: null }
+            ];
+            
+            let results = '<h4>parseForRatio Function Test Results:</h4>';
+            let allPassed = true;
+            
+            testCases.forEach(test => {
+                const result = parseForRatio(test.input);
+                const passed = result === test.expected;
+                if (!passed) allPassed = false;
+                
+                results += `<div>${passed ? '✅' : '❌'} Input: "${test.input}" → Output: ${result} (Expected: ${test.expected})</div>`;
+            });
+            
+            results += `<div style="margin-top: 10px; font-weight: bold;">${allPassed ? '🎉 All tests passed!' : '⚠️ Some tests failed!'}</div>`;
+            
+            document.getElementById('functionTestResults').innerHTML = results;
+            document.getElementById('functionTest').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

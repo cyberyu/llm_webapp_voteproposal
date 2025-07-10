@@ -302,11 +302,11 @@ async def plot_hist_2025(background_tasks: BackgroundTasks):
 
 @app.get("/default-peer-analysis")
 async def serve_default_peer_analysis():
-    return FileResponse("df_peer_analysis_unfavorable_propsals.csv")
+    return FileResponse("filtered_proposals.csv")
 
 @app.get("/default-large-dataset") 
 async def serve_default_large_dataset():
-    return FileResponse("df_peer_analysis_large_dataset.csv")
+    return FileResponse("2025_Predictions_All_Issuers_v9.csv")
 
 @app.get("/hist_2025/{filename}")
 async def serve_hist_2025_image(filename: str):

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Button Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .status { padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; font-family: monospace; }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        iframe { width: 100%; height: 600px; border: 1px solid #ccc; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Export Issuer List Button Debug</h1>
+    
+    <div class="status info">
+        <h3>🛠️ Debug Instructions</h3>
+        <ol>
+            <li><strong>Open the main application</strong> in the iframe below</li>
+            <li><strong>Load the default dataset</strong> by clicking "Load Default File"</li>
+            <li><strong>Wait for charts to load</strong> and verify issuer distribution chart appears</li>
+            <li><strong>Click "Export Issuer List" button</strong> in the Issuer Distribution section</li>
+            <li><strong>Check browser console</strong> (F12) for any errors</li>
+            <li><strong>Use the test buttons below</strong> to verify variables</li>
+        </ol>
+    </div>
+
+    <div class="status error">
+        <h3>🚨 Expected Issue</h3>
+        <p>The Export Issuer List button might not be working due to:</p>
+        <ul>
+            <li><code>lastIssuerDistributionLabels</code> array is empty or undefined</li>
+            <li>Chart not generating/populating the labels array</li>
+            <li>Button click handler not executing</li>
+            <li>File download API issues</li>
+        </ul>
+    </div>
+
+    <button onclick="testVariables()">🔍 Test Variables</button>
+    <button onclick="testButtonHandler()">🧪 Test Button Handler</button>
+    <button onclick="openInNewTab()">🚀 Open in New Tab</button>
+    <button onclick="simulateExport()">📄 Simulate Export</button>
+
+    <div id="testResults"></div>
+
+    <iframe src="peeranalysis.html" title="Main Application"></iframe>
+
+    <script>
+        function testVariables() {
+            try {
+                // Access the iframe and check variables
+                const iframe = document.querySelector('iframe');
+                const iframeWindow = iframe.contentWindow;
+                
+                if (!iframeWindow.lastIssuerDistributionLabels) {
+                    showResult('❌ Variable lastIssuerDistributionLabels is undefined', 'fail');
+                    return;
+                }
+                
+                const labels = iframeWindow.lastIssuerDistributionLabels;
+                if (labels.length === 0) {
+                    showResult('⚠️ Variable lastIssuerDistributionLabels is empty (length: 0)', 'fail');
+                } else {
+                    showResult(`✅ Variable lastIssuerDistributionLabels has ${labels.length} items: ${labels.slice(0, 3).join(', ')}${labels.length > 3 ? '...' : ''}`, 'pass');
+                }
+                
+                // Check if issuer chart has been generated
+                const chartContainer = iframeWindow.document.getElementById('issuerChartContainer');
+                if (chartContainer && chartContainer.innerHTML.includes('canvas')) {
+                    showResult('✅ Issuer chart appears to be generated (canvas found)', 'pass');
+                } else {
+                    showResult('❌ Issuer chart not generated or canvas not found', 'fail');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error accessing iframe variables: ${error.message}`, 'fail');
+            }
+        }
+        
+        function testButtonHandler() {
+            try {
+                const iframe = document.querySelector('iframe');
+                const iframeWindow = iframe.contentWindow;
+                const button = iframeWindow.document.getElementById('exportIssuerDistributionBtn');
+                
+                if (!button) {
+                    showResult('❌ Export button not found in DOM', 'fail');
+                    return;
+                }
+                
+                if (button.disabled) {
+                    showResult('⚠️ Export button is disabled', 'fail');
+                } else {
+                    showResult('✅ Export button is enabled', 'pass');
+                }
+                
+                // Check if click listener is attached
+                const events = getEventListeners ? getEventListeners(button) : 'Cannot check events';
+                if (events && events.click) {
+                    showResult(`✅ Button has ${events.click.length} click listener(s)`, 'pass');
+                } else {
+                    showResult('⚠️ Cannot verify click listeners (check manually)', 'fail');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error testing button: ${error.message}`, 'fail');
+            }
+        }
+        
+        function simulateExport() {
+            try {
+                const iframe = document.querySelector('iframe');
+                const iframeWindow = iframe.contentWindow;
+                
+                // Create mock data and test export function
+                const mockLabels = ['Apple Inc.', 'Microsoft Corp.', 'Google LLC', 'Amazon.com Inc.'];
+                iframeWindow.lastIssuerDistributionLabels = mockLabels;
+                
+                // Test the downloadFile function
+                if (typeof iframeWindow.downloadFile === 'function') {
+                    const csvContent = mockLabels.join('\n');
+                    iframeWindow.downloadFile(csvContent, 'test_issuer_list.csv');
+                    showResult('✅ Export simulation completed - check downloads', 'pass');
+                } else {
+                    showResult('❌ downloadFile function not found', 'fail');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error in export simulation: ${error.message}`, 'fail');
+            }
+        }
+        
+        function openInNewTab() {
+            window.open('peeranalysis.html', '_blank');
+        }
+        
+        function showResult(message, type) {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            document.getElementById('testResults').appendChild(div);
+        }
+        
+        // Clear results on page load
+        window.onload = function() {
+            document.getElementById('testResults').innerHTML = '<h4>🧪 Test Results:</h4>';
+        };
+    </script>
+</body>
+</html>

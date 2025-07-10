@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Export Button Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .console { background: #000; color: #0f0; padding: 15px; border-radius: 5px; font-family: monospace; margin: 15px 0; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Export Button Quick Test</h1>
+    
+    <button onclick="testExportButton()">Test Export Button</button>
+    <button onclick="openMainApp()">Open Main App</button>
+    
+    <div id="console" class="console">
+        Console Output:<br>
+    </div>
+
+    <script>
+        function log(message) {
+            document.getElementById('console').innerHTML += message + '<br>';
+        }
+        
+        function testExportButton() {
+            log('🧪 Testing Export Button Functionality...');
+            
+            // Test 1: Create mock data and export function
+            const mockData = ['Apple Inc.', 'Microsoft Corp.', 'Google LLC'];
+            
+            function downloadFile(csvContent, filename) {
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename || 'test_export.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log('✅ Download triggered successfully');
+            }
+            
+            // Test 2: Check File System Access API
+            if ('showSaveFilePicker' in window) {
+                log('✅ Modern File System Access API supported');
+            } else {
+                log('⚠️ File System Access API not supported, will use fallback');
+            }
+            
+            // Test 3: Simulate export
+            try {
+                const csvContent = mockData.join('\n');
+                downloadFile(csvContent, 'test_issuer_export.csv');
+                log('✅ Export test completed - check your downloads folder');
+            } catch (error) {
+                log('❌ Export test failed: ' + error.message);
+            }
+        }
+        
+        function openMainApp() {
+            window.open('http://localhost:8000/peeranalysis.html', '_blank');
+        }
+        
+        log('🚀 Ready to test export functionality');
+    </script>
+</body>
+</html>

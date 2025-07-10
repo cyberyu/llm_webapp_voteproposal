@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Summary Functionality</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-step { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-instructions { background-color: #f0f8ff; }
+        .test-results { background-color: #f0fff0; }
+        .error { color: red; }
+        .success { color: green; }
+        iframe { width: 100%; height: 600px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Testing Show Summary Button Functionality</h1>
+    
+    <div class="test-step test-instructions">
+        <h3>Test Instructions:</h3>
+        <ol>
+            <li>Open the browser's Developer Tools (F12)</li>
+            <li>Go to the Console tab</li>
+            <li>Load the peeranalysis.html page below</li>
+            <li>Wait for both datasets to load completely</li>
+            <li>Select an issuer from either the Peer Analysis or Large Dataset dropdown</li>
+            <li>Click the "Show Summary" button</li>
+            <li>Check that a summary appears with issuer information</li>
+            <li>Look at the console for detailed debug output</li>
+        </ol>
+    </div>
+    
+    <div class="test-step">
+        <h3>Expected Results:</h3>
+        <ul>
+            <li>Show Summary button should be enabled when a valid issuer is selected in either dropdown</li>
+            <li>Clicking the button should generate a comprehensive summary</li>
+            <li>Summary should include: issuer name, record dates, job numbers, services, management recommendations, approval rates, proposal counts, and detailed proposal breakdowns</li>
+            <li>Console should show detailed debug information about data processing</li>
+        </ul>
+    </div>
+    
+    <div class="test-step">
+        <h3>Test the Show Summary Button:</h3>
+        <iframe src="http://localhost:8000/peeranalysis.html"></iframe>
+    </div>
+    
+    <div class="test-step test-results">
+        <h3>Test Results (fill in after testing):</h3>
+        <p><strong>Button Status:</strong> ____________</p>
+        <p><strong>Summary Generated:</strong> ____________</p>
+        <p><strong>Data Displayed:</strong> ____________</p>
+        <p><strong>Console Output:</strong> ____________</p>
+        <p><strong>Issues Found:</strong> ____________</p>
+    </div>
+    
+    <div class="test-step">
+        <h3>Additional Test Cases:</h3>
+        <ol>
+            <li><strong>Test with Peer Analysis dropdown:</strong> Select an issuer only from the peer analysis dropdown</li>
+            <li><strong>Test with Large Dataset dropdown:</strong> Select an issuer only from the large dataset dropdown</li>
+            <li><strong>Test with both dropdowns:</strong> Select different issuers in both dropdowns</li>
+            <li><strong>Test edge cases:</strong> Try issuers that might have special characters or formatting differences</li>
+        </ol>
+    </div>
+</body>
+</html>
