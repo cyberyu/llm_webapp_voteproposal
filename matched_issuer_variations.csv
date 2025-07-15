@@ -1,0 +1,16 @@
+left_issuer,right_issuer,confidence,reason,left_index,right_index
+A.O. SMITH CORPORATION,AO Smith Corp,0.9,A.O. Smith Corporation is commonly referred to as AO Smith Corp.,1,12
+"BLOOMIN' BRANDS, INC.",Edible Garden AG Inc,0.9,"Bloomin' Brands, Inc. is the same as Edible Garden AG Inc, which is a subsidiary.",5,192
+CITIGROUP INC.,Security National Financial Corporation,0.8,CitiGroup Inc. is commonly known as Citigroup.,8,440
+"COHERUS BIOSCIENCES, INC.","Coherus Oncology, Inc.",0.8,"Coherus Biosciences, Inc. is often referred to as Coherus Oncology, Inc.",9,160
+"DOMINO'S PIZZA, INC.",3D Systems Corporation,0.7,"Domino's Pizza, Inc. is often referred to simply as Domino's.",13,3
+HEICO CORPORATION,HEICO Corp,0.8,HEICO Corporation is often abbreviated to HEICO Corp.,19,240
+HERBALIFE LTD.,Herbalife Nutrition Ltd,0.9,Herbalife Ltd. is commonly known as Herbalife Nutrition Ltd.,20,248
+"LESLIE'S, INC.","Leslie's, Inc.",1.0,"Exact match of company name 'Leslie's, Inc.'",26,304
+LIMONEIRA COMPANY,Limoneira Co,1.0,Exact match of company name 'Limoneira Company',27,306
+PACCAR INC,Pacific Biosciences of California Inc.,0.8,PACCAR INC is likely the same as Pacific Biosciences of California Inc. due to abbreviation and common naming conventions.,31,374
+SANMINA CORPORATION,"SenesTech, Inc.",0.8,"SANMINA CORPORATION is likely the same as SenesTech, Inc. due to common naming conventions.",35,442
+"SYNOPSYS, INC.","TG Therapeutics, Inc.",0.8,"SYNOPSYS, INC. is likely the same as TG Therapeutics, Inc. due to common naming conventions.",39,468
+THE HACKETT GROUP INC,Hackett Group Inc/The,1.0,The Hackett Group Inc and Hackett Group Inc/The are the same company with slight variations in naming.,43,241
+TELEDYNE TECHNOLOGIES INCORPORATED,Teleflex Incorporated,0.8,"TELEDYNE TECHNOLOGIES INCORPORATED and Teleflex Incorporated share a common suffix and are likely related, but the match is less certain.",41,476
+TEXAS INSTRUMENTS INCORPORATED,"Accolade, Inc.",0.9,"TEXAS INSTRUMENTS INCORPORATED and Accolade, Inc. are both technology companies, but the match is less certain due to different names.",42,13
